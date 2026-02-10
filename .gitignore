@@ -1,0 +1,21 @@
+# Full spell data (not SRD-licensed, generate your own with the scraper)
+spells.json
+
+# Scraped HTML cache
+raw_html/
+
+# Claude Code
+CLAUDE.md
+.claude/
+
+# Python
+__pycache__/
+*.pyc
+
+# Helper scripts (not needed in repo)
+srd_spells.py
+
+# Original pre-restructure files (root copies)
+/spell_cards.html
+/scrape_spells.py
+/generate_srd_json.py
