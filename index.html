@@ -922,6 +922,12 @@
         <div class="button-row" style="margin-top: 10px;">
             <button id="saveList" class="secondary">Save Spell List</button>
             <button id="loadList" class="secondary">Load Spell List</button>
+            <button id="shareLink" class="secondary">Share Link</button>
+            <button id="copyText" class="secondary">Copy as Text</button>
+            <button id="pasteList" class="secondary">Paste List</button>
+            <button id="exportFile" class="secondary">Export JSON</button>
+            <input type="file" id="importFileInput" accept=".json,.txt" style="display:none;">
+            <button id="importFile" class="secondary">Import JSON</button>
         </div>
 
         <div class="custom-spell-panel">
@@ -1478,6 +1484,179 @@
             showStatus(`Loaded spell list "${name}"`, 'success');
         });
 
+        // ===== SHARING & IMPORT/EXPORT =====
+
+        // Share Link — copy URL with spell names as query parameter
+        document.getElementById('shareLink').addEventListener('click', () => {
+            if (selectedSpells.size === 0) {
+                showStatus('No spells selected to share', 'error');
+                return;
+            }
+            const names = Array.from(selectedSpells).map(n => encodeURIComponent(n)).join(',');
+            const url = `${location.origin}${location.pathname}?spells=${names}`;
+            navigator.clipboard.writeText(url).then(() => {
+                showStatus('Share link copied to clipboard!', 'success');
+            }).catch(() => {
+                prompt('Copy this link to share your spell list:', url);
+            });
+        });
+
+        // Load spells from URL on startup (called after spell data loads)
+        function loadSpellsFromURL() {
+            const params = new URLSearchParams(window.location.search);
+            const spellsParam = params.get('spells');
+            if (!spellsParam) return;
+
+            const names = spellsParam.split(',').map(n => decodeURIComponent(n.trim())).filter(Boolean);
+            let added = 0, skipped = 0;
+            names.forEach(name => {
+                const spell = allSpells.find(s => s.name.toLowerCase() === name.toLowerCase());
+                if (spell) {
+                    selectedSpells.add(spell.name);
+                    added++;
+                } else {
+                    skipped++;
+                }
+            });
+            if (added > 0) {
+                updateSelectedSpellsList();
+                let msg = `Loaded ${added} spells from shared link`;
+                if (skipped > 0) msg += ` (${skipped} not found)`;
+                showStatus(msg, 'success');
+            } else if (skipped > 0) {
+                showStatus(`None of the ${skipped} shared spells were found in the current data`, 'error');
+            }
+        }
+
+        // Copy as Text — plain text list to clipboard
+        document.getElementById('copyText').addEventListener('click', () => {
+            if (selectedSpells.size === 0) {
+                showStatus('No spells selected', 'error');
+                return;
+            }
+            const sorted = Array.from(selectedSpells)
+                .map(name => allSpells.find(s => s.name === name))
+                .filter(Boolean)
+                .sort((a, b) => a.level - b.level || a.name.localeCompare(b.name))
+                .map(s => s.name);
+            navigator.clipboard.writeText(sorted.join('\n')).then(() => {
+                showStatus('Spell list copied to clipboard!', 'success');
+            }).catch(() => {
+                prompt('Copy this spell list:', sorted.join(', '));
+            });
+        });
+
+        // Paste List — import from pasted text
+        document.getElementById('pasteList').addEventListener('click', () => {
+            const input = prompt('Paste a list of spell names (one per line, or comma-separated):');
+            if (!input) return;
+
+            const names = input.split(/[\n,]+/).map(n => n.trim()).filter(Boolean);
+            let added = 0, notFound = [];
+            names.forEach(name => {
+                const spell = allSpells.find(s => s.name.toLowerCase() === name.toLowerCase());
+                if (spell) {
+                    if (!selectedSpells.has(spell.name)) {
+                        selectedSpells.add(spell.name);
+                        added++;
+                    }
+                } else {
+                    notFound.push(name);
+                }
+            });
+            updateSelectedSpellsList();
+            let msg = `Added ${added} spells`;
+            if (notFound.length > 0) msg += ` (${notFound.length} not found: ${notFound.slice(0, 3).join(', ')}${notFound.length > 3 ? '...' : ''})`;
+            showStatus(msg, added > 0 ? 'success' : 'error');
+        });
+
+        // Export File — download full spell data as JSON (compatible with "Load custom spells.json")
+        document.getElementById('exportFile').addEventListener('click', () => {
+            if (selectedSpells.size === 0) {
+                showStatus('No spells selected to export', 'error');
+                return;
+            }
+            const spells = Array.from(selectedSpells)
+                .map(name => allSpells.find(s => s.name === name))
+                .filter(Boolean)
+                .sort((a, b) => a.level - b.level || a.name.localeCompare(b.name));
+            const data = JSON.stringify(spells, null, 2);
+            const blob = new Blob([data], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'spell-list.json';
+            a.click();
+            URL.revokeObjectURL(url);
+            showStatus(`Exported ${spells.length} spells!`, 'success');
+        });
+
+        // Import File — load spell list from JSON or TXT file
+        const importFileInput = document.getElementById('importFileInput');
+        document.getElementById('importFile').addEventListener('click', () => {
+            importFileInput.click();
+        });
+
+        importFileInput.addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            importFileInput.value = '';
+
+            try {
+                const text = await file.text();
+                let added = 0, skipped = 0;
+
+                if (file.name.endsWith('.json')) {
+                    const data = JSON.parse(text);
+                    const arr = Array.isArray(data) ? data : (data.spells || []);
+
+                    if (arr.length > 0 && typeof arr[0] === 'object' && arr[0].name) {
+                        // Full spell objects — add to allSpells and select them
+                        arr.forEach(spell => {
+                            if (!allSpells.find(s => s.name === spell.name)) {
+                                allSpells.push(spell);
+                            }
+                            if (!selectedSpells.has(spell.name)) {
+                                selectedSpells.add(spell.name);
+                                added++;
+                            }
+                        });
+                    } else {
+                        // Array of spell name strings
+                        arr.forEach(name => {
+                            const spell = allSpells.find(s => s.name.toLowerCase() === String(name).toLowerCase());
+                            if (spell && !selectedSpells.has(spell.name)) {
+                                selectedSpells.add(spell.name);
+                                added++;
+                            } else if (!spell) {
+                                skipped++;
+                            }
+                        });
+                    }
+                } else {
+                    // Plain text — one spell per line
+                    const names = text.split(/[\n,]+/).map(n => n.trim()).filter(Boolean);
+                    names.forEach(name => {
+                        const spell = allSpells.find(s => s.name.toLowerCase() === name.toLowerCase());
+                        if (spell && !selectedSpells.has(spell.name)) {
+                            selectedSpells.add(spell.name);
+                            added++;
+                        } else if (!spell) {
+                            skipped++;
+                        }
+                    });
+                }
+
+                updateSelectedSpellsList();
+                populateSourceDropdown();
+                let msg = `Imported ${added} spells from ${file.name}`;
+                if (skipped > 0) msg += ` (${skipped} not found)`;
+                showStatus(msg, added > 0 ? 'success' : 'error');
+            } catch (err) {
+                showStatus(`Error reading file: ${err.message}`, 'error');
+            }
+        });
+
         // Generate cards
         document.getElementById('generateCards').addEventListener('click', generateCards);
 
@@ -1702,9 +1881,11 @@
         tryLoadDefaultSpells = async function() {
             await origTryLoad();
             loadCustomSpells();
+            loadSpellsFromURL();
         };
         // Re-run since we just replaced it after it already ran
         loadCustomSpells();
+        loadSpellsFromURL();
 
         document.getElementById('addCustomSpell').addEventListener('click', () => {
             const name = document.getElementById('csName').value.trim();

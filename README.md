@@ -13,6 +13,7 @@ A free web tool for generating printable spell cards for D&D 5th Edition.
 - **Multiple card sizes**: Poker, Tarot, Index, and Large
 - **Adjustable font sizes** for readability vs. content density
 - **Print-optimized** layout with cut guides and automatic page breaks
+- **Share spell lists** via URL, clipboard text, or JSON export/import
 - **Save & load** spell lists in your browser
 - **Create custom spells** directly in the browser with Markdown formatting support
 - **Load your own data** — bring a complete spell list with the included scraper tool
@@ -33,8 +34,8 @@ The site ships with spells from the [SRD 5.1](https://media.wizards.com/2016/dow
 - PDF export
 
 **Sharing & portability:**
-- Shareable spell list URLs (e.g. `?spells=fireball,shield`)
-- Import/export spell lists as files
+- ~~Shareable spell list URLs~~ Done!
+- ~~Import/export spell lists~~ Done!
 
 **Data sources:**
 - Import from more sources (2024 5e, wikia, homebrew wiki, Homebrewery pages)
