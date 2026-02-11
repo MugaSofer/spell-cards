@@ -1,12 +1,8 @@
-# D&D 5e Spell Scraper
+# D&D 5e Spell Scrapers
 
-Scrapes spell data from Wikidot spell databases and outputs a JSON file compatible with the [Spell Card Generator](https://github.com/MugaSofer/spell-cards).
+Tools for downloading spell data from various sources, outputting JSON files compatible with the [Spell Card Generator](https://github.com/MugaSofer/spell-cards).
 
-Supports two sources:
-- **2014 rules** — [dnd5e.wikidot.com](http://dnd5e.wikidot.com) (500+ spells from PHB, XGE, TCE, etc.)
-- **2024 rules** — [dnd2024.wikidot.com](http://dnd2024.wikidot.com) (400+ spells from the 2024 PHB)
-
-The website ships with SRD 5.1 spells only (319 spells, freely licensed). Use this scraper to generate a complete dataset for personal use.
+The website ships with SRD 5.1 spells only (319 spells, freely licensed). Use these scrapers to generate a complete dataset for personal use.
 
 ## Setup
 
@@ -15,33 +11,39 @@ cd scraper
 pip install -r requirements.txt
 ```
 
-## Usage
+## Sources
 
-**Scrape 2014 spells** (default):
+### Wikidot (scrape_spells.py)
+
+Scrapes from Wikidot spell databases. Best for complete WotC spell lists.
+
 ```bash
-python scrape_spells.py
+python scrape_spells.py                  # 2014 rules (dnd5e.wikidot.com, 500+ spells)
+python scrape_spells.py --site 2024      # 2024 rules (dnd2024.wikidot.com, 400+ spells)
+python scrape_spells.py --reparse        # Reparse from cached HTML (no network)
 ```
 
-**Scrape 2024 spells**:
-```bash
-python scrape_spells.py --site 2024
-```
-
-**Reparse only** (uses cached HTML, no network requests):
-```bash
-python scrape_spells.py --reparse
-python scrape_spells.py --site 2024 --reparse
-```
-
-Output per site:
 | Site | Spell database | Cached HTML |
 |------|---------------|-------------|
 | 2014 | `spells.json` | `raw_html/` |
 | 2024 | `spells_2024.json` | `raw_html_2024/` |
 
+### Open5e (scrape_open5e.py)
+
+Downloads from the [Open5e REST API](https://api.open5e.com). Includes SRD spells plus third-party OGL content (Kobold Press Deep Magic, Level Up A5E, Tome of Heroes, etc.). Does **not** include non-SRD WotC spells.
+
+```bash
+python scrape_open5e.py                    # All 1400+ spells
+python scrape_open5e.py --source wotc-srd  # SRD only (319 spells)
+python scrape_open5e.py --source dmag      # Deep Magic only (500+ spells)
+python scrape_open5e.py --list-sources     # Show available sources
+```
+
+Output: `spells_open5e.json` (or `spells_open5e_<source>.json` when filtered)
+
 ## Using with the Spell Card Generator
 
-Use the "Load custom spells.json" button in the web interface to load the output file directly.
+Use the "Load custom spells.json" button in the web interface to load any output file directly.
 
 ## Regenerating SRD spells
 

@@ -25,7 +25,7 @@ The site ships with spells from the [SRD 5.1](https://media.wizards.com/2016/dow
 
 ## Planned Features
 
-- Import from more sources (2024 5e, wikia, homebrew wiki, Homebrewery pages)
+- Import from more sources (homebrew wiki, Homebrewery pages, D&D Beyond)
 
 ## Contributing
 
