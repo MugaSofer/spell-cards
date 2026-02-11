@@ -25,20 +25,6 @@ The site ships with spells from the [SRD 5.1](https://media.wizards.com/2016/dow
 
 ## Planned Features
 
-**Card generation:**
-- ~~Optimized print layouts (less wasted white space)~~ Done!
-- ~~Multi-card splitting for long spell descriptions~~ Done!
-- ~~Filter by school of magic or source book~~ Done!
-- ~~Alternative color-coding options~~ Done!
-- ~~Custom spell entry form (no JSON needed)~~ Done!
-- ~~Card backs for double-sided printing~~ Done!
-- ~~PDF export~~ Use "Save as PDF" in your browser's print dialog
-
-**Sharing & portability:**
-- ~~Shareable spell list URLs~~ Done!
-- ~~Import/export spell lists~~ Done!
-
-**Data sources:**
 - Import from more sources (2024 5e, wikia, homebrew wiki, Homebrewery pages)
 
 ## Contributing
