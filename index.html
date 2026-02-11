@@ -1289,6 +1289,8 @@
                     document.getElementById('srdBanner').style.display = 'block';
                     document.getElementById('srdCount').textContent = allSpells.length;
                     populateSourceDropdown();
+                    loadCustomSpells();
+                    loadSpellsFromURL();
                     return;
                 }
                 // Fall back to full spells.json if present
@@ -1296,6 +1298,8 @@
                 if (resp.ok) {
                     allSpells = await resp.json();
                     populateSourceDropdown();
+                    loadCustomSpells();
+                    loadSpellsFromURL();
                     showStatus(`Loaded ${allSpells.length} spells from spells.json`, 'success');
                 }
             } catch (e) {
@@ -1877,15 +1881,8 @@
         }
 
         // Restore custom spells after default data loads
-        const origTryLoad = tryLoadDefaultSpells;
-        tryLoadDefaultSpells = async function() {
-            await origTryLoad();
-            loadCustomSpells();
-            loadSpellsFromURL();
-        };
-        // Re-run since we just replaced it after it already ran
-        loadCustomSpells();
-        loadSpellsFromURL();
+        // Note: loadCustomSpells() and loadSpellsFromURL() are called
+        // inside tryLoadDefaultSpells() after spell data loads
 
         document.getElementById('addCustomSpell').addEventListener('click', () => {
             const name = document.getElementById('csName').value.trim();
