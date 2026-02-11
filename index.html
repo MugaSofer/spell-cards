@@ -745,9 +745,10 @@
             box-sizing: border-box;
             color: var(--back-color, #5c1d91);
         }
-        .card-back-ornament { font-size: 24pt; margin-bottom: 6px; }
+        .card-back-ornament { font-size: 32pt; margin-bottom: 4px; line-height: 1; }
         .card-back-name { font-weight: bold; font-size: var(--font-name); text-align: center; }
         .card-back-info { font-size: var(--font-school); font-style: italic; color: #888; text-align: center; }
+        .card-back-class { font-size: var(--font-footer); color: #999; text-align: center; margin-top: 2px; }
         .card-spacer { width: var(--card-width); height: var(--card-height); }
 
         /* Page wrappers - invisible on screen */
@@ -1013,11 +1014,16 @@
                 <div id="cardBackOptions" style="display:none; margin-top:6px; font-size:13px;">
                     <label style="display:block; margin:3px 0;"><input type="checkbox" id="backShowName" checked> Show spell name</label>
                     <label style="display:block; margin:3px 0;"><input type="checkbox" id="backShowInfo" checked> Show school & level</label>
+                    <label style="display:block; margin:3px 0;"><input type="checkbox" id="backShowClass" checked> Show class</label>
                     <div style="margin:4px 0;">
                         <label for="backOrnament">Ornament:</label>
                         <select id="backOrnament" style="font-size:13px;">
-                            <option value="simple">✦ Simple</option>
-                            <option value="ornate">❖ Ornate</option>
+                            <option value="star">✦ Star</option>
+                            <option value="fleur">⚜ Fleur-de-lis</option>
+                            <option value="swords">⚔ Swords</option>
+                            <option value="arcane">☽✦☾ Arcane</option>
+                            <option value="diamond">◆◇◆ Diamond</option>
+                            <option value="hedera">❧ Hedera</option>
                             <option value="none">None</option>
                         </select>
                     </div>
@@ -1209,6 +1215,7 @@
         const cardBackOptions = document.getElementById('cardBackOptions');
         const backShowName = document.getElementById('backShowName');
         const backShowInfo = document.getElementById('backShowInfo');
+        const backShowClass = document.getElementById('backShowClass');
         const backOrnament = document.getElementById('backOrnament');
         const backFlip = document.getElementById('backFlip');
 
@@ -1363,25 +1370,35 @@
             const schoolText = schoolEl ? schoolEl.textContent : '';
             const info = schoolText || levelText;
 
+            const classesEl = frontCard.querySelector('.card-classes');
+            const classes = classesEl ? classesEl.textContent : '';
+
             const borderColor = getComputedStyle(frontCard).borderTopColor;
             back.style.setProperty('--back-color', borderColor);
 
             const showName = backShowName.checked;
             const showInfo = backShowInfo.checked;
+            const showClass = backShowClass.checked;
             const ornamentStyle = backOrnament.value;
 
-            let ornamentHTML = '';
-            if (ornamentStyle === 'simple') {
-                ornamentHTML = '<div class="card-back-ornament">✦</div>';
-            } else if (ornamentStyle === 'ornate') {
-                ornamentHTML = '<div class="card-back-ornament">❖ ⚜ ❖</div>';
-            }
+            const ornaments = {
+                star: '✦',
+                fleur: '⚜',
+                swords: '⚔',
+                arcane: '☽ ✦ ☾',
+                diamond: '◆ ◇ ◆',
+                hedera: '❧',
+            };
+            const ornamentChar = ornaments[ornamentStyle];
+            const ornamentHTML = ornamentChar
+                ? `<div class="card-back-ornament">${ornamentChar}</div>` : '';
 
             back.innerHTML = `
                 <div class="card-back-inner">
                     ${ornamentHTML}
                     ${showName ? `<div class="card-back-name">${name}</div>` : ''}
                     ${showInfo ? `<div class="card-back-info">${info}</div>` : ''}
+                    ${showClass && classes ? `<div class="card-back-class">${classes}</div>` : ''}
                 </div>
             `;
 
@@ -1453,7 +1470,7 @@
                 generateCardBacks();
             }
         });
-        [backShowName, backShowInfo, backOrnament, backFlip].forEach(el => {
+        [backShowName, backShowInfo, backShowClass, backOrnament, backFlip].forEach(el => {
             el.addEventListener('change', () => {
                 if (cardBacksCheckbox.checked && cardsContainer.querySelectorAll('.spell-card').length > 0) {
                     generateCardBacks();
