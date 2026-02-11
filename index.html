@@ -129,6 +129,12 @@
             margin-bottom: 20px;
         }
 
+        @media (min-width: 768px) {
+            .levels-group {
+                grid-row: span 2;
+            }
+        }
+
         .control-group {
             display: flex;
             flex-direction: column;
@@ -803,7 +809,7 @@
                 </select>
             </div>
 
-            <div class="control-group">
+            <div class="control-group levels-group">
                 <label>Spell Levels</label>
                 <div class="level-checkboxes" id="levelCheckboxes">
                     <label><input type="checkbox" value="0" checked><span>Cantrip</span></label>
