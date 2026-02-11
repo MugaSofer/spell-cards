@@ -1,18 +1,19 @@
 #!/usr/bin/env python3
 """
 D&D 5e Spell Scraper
-Extracts spell data from dnd5e.wikidot.com and saves to JSON.
+Extracts spell data from Wikidot spell databases and saves to JSON.
 Also saves raw HTML for debugging/reprocessing.
 
 Usage:
     cd scraper
     pip install -r requirements.txt
-    python scrape_spells.py           # Scrape all spells
-    python scrape_spells.py --reparse # Reparse from saved HTML (no network)
+    python scrape_spells.py                  # Scrape 2014 spells (dnd5e.wikidot.com)
+    python scrape_spells.py --site 2024      # Scrape 2024 spells (dnd2024.wikidot.com)
+    python scrape_spells.py --reparse        # Reparse from saved HTML (no network)
 
 Output:
-    spells.json  - Full spell database (place in project root to use with the generator)
-    raw_html/    - Cached HTML for each spell page
+    spells.json / spells_2024.json  - Spell database
+    raw_html/ / raw_html_2024/      - Cached HTML for each spell page
 """
 
 import argparse
@@ -23,11 +24,6 @@ from pathlib import Path
 
 import requests
 from bs4 import BeautifulSoup, NavigableString
-
-BASE_URL = "http://dnd5e.wikidot.com"
-SPELL_LIST_URL = f"{BASE_URL}/spells"
-RAW_HTML_DIR = Path(__file__).parent / "raw_html"
-OUTPUT_FILE = Path(__file__).parent / "spells.json"
 
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
@@ -40,6 +36,68 @@ SPELL_CLASSES = [
 
 SCHOOLS = ["abjuration", "conjuration", "divination", "enchantment",
            "evocation", "illusion", "necromancy", "transmutation"]
+
+SOURCE_MAP_2014 = {
+    "player's handbook": "PHB",
+    "xanathar's guide to everything": "XGE",
+    "tasha's cauldron of everything": "TCE",
+    "sword coast adventurer's guide": "SCAG",
+    "explorer's guide to wildemount": "EGW",
+    "fizban's treasury of dragons": "FTD",
+    "strixhaven: a curriculum of chaos": "SCC",
+    "acquisitions incorporated": "AI",
+    "elemental evil player's companion": "EEPC",
+}
+
+SOURCE_MAP_2024 = {
+    "player's handbook": "PHB24",
+    "dungeon master's guide": "DMG24",
+    "free rules": "Free24",
+}
+
+SITE_CONFIGS = {
+    "2014": {
+        "base_url": "http://dnd5e.wikidot.com",
+        "spell_list_path": "/spells",
+        "raw_html_dir": Path(__file__).parent / "raw_html",
+        "output_file": Path(__file__).parent / "spells.json",
+        "label": "D&D 5e (2014)",
+        "default_source": "PHB",
+        "source_map": SOURCE_MAP_2014,
+    },
+    "2024": {
+        "base_url": "http://dnd2024.wikidot.com",
+        "spell_list_path": "/spell:all",
+        "raw_html_dir": Path(__file__).parent / "raw_html_2024",
+        "output_file": Path(__file__).parent / "spells_2024.json",
+        "label": "D&D 5e (2024)",
+        "default_source": "PHB24",
+        "source_map": SOURCE_MAP_2024,
+    },
+}
+
+# Module-level state set by configure_site()
+BASE_URL = ""
+SPELL_LIST_URL = ""
+RAW_HTML_DIR = Path()
+OUTPUT_FILE = Path()
+SITE = "2014"
+DEFAULT_SOURCE = "PHB"
+SOURCE_MAP = {}
+
+
+def configure_site(site: str):
+    """Set module-level variables based on the chosen site."""
+    global BASE_URL, SPELL_LIST_URL, RAW_HTML_DIR, OUTPUT_FILE
+    global SITE, DEFAULT_SOURCE, SOURCE_MAP
+    config = SITE_CONFIGS[site]
+    BASE_URL = config["base_url"]
+    SPELL_LIST_URL = config["base_url"] + config["spell_list_path"]
+    RAW_HTML_DIR = config["raw_html_dir"]
+    OUTPUT_FILE = config["output_file"]
+    SITE = site
+    DEFAULT_SOURCE = config["default_source"]
+    SOURCE_MAP = config["source_map"]
 
 
 def get_soup(url: str) -> BeautifulSoup:
@@ -55,6 +113,7 @@ def get_all_spell_links() -> list[dict]:
     soup = get_soup(SPELL_LIST_URL)
 
     spells = []
+    seen_slugs = set()
     content = soup.find("div", {"id": "page-content"})
     if not content:
         raise ValueError("Could not find page content")
@@ -65,8 +124,12 @@ def get_all_spell_links() -> list[dict]:
             if cells:
                 link = cells[0].find("a")
                 if link and link.get("href", "").startswith("/spell:"):
-                    spell_name = link.text.strip()
                     spell_slug = link["href"].replace("/spell:", "")
+                    # Deduplicate (2024 site has tabbed tables that might overlap)
+                    if spell_slug in seen_slugs:
+                        continue
+                    seen_slugs.add(spell_slug)
+                    spell_name = link.text.strip()
                     spells.append({
                         "name": spell_name,
                         "slug": spell_slug,
@@ -111,42 +174,40 @@ def parse_spell_html(html: str, name: str) -> dict | None:
         paragraphs = content.find_all(["p", "ul", "ol"])
 
         # === Parse source (usually first paragraph) ===
-        spell["source"] = "PHB"  # Default
+        spell["source"] = DEFAULT_SOURCE
         for p in paragraphs[:2]:
             text = p.get_text(strip=True)
             if text.lower().startswith("source:"):
                 source_text = text[7:].strip()
-                # Map common source names to abbreviations
-                source_map = {
-                    "player's handbook": "PHB",
-                    "xanathar's guide to everything": "XGE",
-                    "tasha's cauldron of everything": "TCE",
-                    "sword coast adventurer's guide": "SCAG",
-                    "explorer's guide to wildemount": "EGW",
-                    "fizban's treasury of dragons": "FTD",
-                    "strixhaven: a curriculum of chaos": "SCC",
-                    "acquisitions incorporated": "AI",
-                    "elemental evil player's companion": "EEPC",
-                }
-                for full_name, abbrev in source_map.items():
+                for full_name, abbrev in SOURCE_MAP.items():
                     if full_name in source_text.lower():
                         spell["source"] = abbrev
                         break
                 else:
-                    # Just take first word as abbreviation if not found
-                    spell["source"] = source_text.split()[0][:5] if source_text else "PHB"
+                    spell["source"] = source_text.split()[0][:5] if source_text else DEFAULT_SOURCE
                 break
 
-        # === Parse spell level and school ===
-        # Look for <em> tag with level/school info
+        # === Parse spell level, school, and (for 2024) classes from <em> tag ===
         spell["level"] = 0
         spell["school"] = "Unknown"
         spell["ritual"] = False
+        classes_from_level_line = []
 
-        for p in paragraphs[:3]:
+        for p in paragraphs[:4]:
             em = p.find("em")
             if em:
-                text = em.get_text(strip=True).lower()
+                em_text = em.get_text(strip=True)
+                text = em_text.lower()
+
+                # Extract classes from parenthetical — 2024 format embeds classes
+                # in the level/school line like "Level 3 Evocation (Sorcerer, Wizard)"
+                class_match = re.search(r"\(([^)]+)\)", em_text)
+                if class_match:
+                    for cls_name in class_match.group(1).split(","):
+                        cls_name = cls_name.strip()
+                        if cls_name in SPELL_CLASSES:
+                            classes_from_level_line.append(cls_name)
+
                 # Check for cantrip
                 if "cantrip" in text:
                     spell["level"] = 0
@@ -156,8 +217,20 @@ def parse_spell_html(html: str, name: str) -> dict | None:
                             break
                     spell["ritual"] = "(ritual)" in text
                     break
-                # Check for leveled spell
+
+                # 2014 format: "3rd-level evocation"
                 level_match = re.search(r"(\d+)(?:st|nd|rd|th)[- ]level", text)
+                if level_match:
+                    spell["level"] = int(level_match.group(1))
+                    for school in SCHOOLS:
+                        if school in text:
+                            spell["school"] = school.capitalize()
+                            break
+                    spell["ritual"] = "(ritual)" in text
+                    break
+
+                # 2024 format: "Level 3 Evocation"
+                level_match = re.search(r"level (\d+)", text)
                 if level_match:
                     spell["level"] = int(level_match.group(1))
                     for school in SCHOOLS:
@@ -188,20 +261,17 @@ def parse_spell_html(html: str, name: str) -> dict | None:
             for strong in strongs:
                 label = strong.get_text(strip=True).lower().rstrip(":")
 
-                # Get text immediately after this strong tag (before next tag)
+                # Get all text after this strong tag until next <br/> or <strong>
                 next_text = ""
                 for sibling in strong.next_siblings:
                     if isinstance(sibling, NavigableString):
-                        text = str(sibling).strip()
-                        if text:
-                            next_text = text
-                            break
-                    elif sibling.name in ["br"]:
-                        # If we hit a br without finding text, the text might be empty
+                        next_text += str(sibling)
+                    elif sibling.name in ["br", "strong", "b"]:
                         break
-                    elif sibling.name in ["strong", "b", "em"]:
-                        # Hit next label without finding text
-                        break
+                    else:
+                        # Inline elements like <a>, <em>, <span> — extract text
+                        next_text += sibling.get_text()
+                next_text = next_text.strip()
 
                 if "casting time" in label:
                     spell["casting_time"] = next_text
@@ -216,6 +286,11 @@ def parse_spell_html(html: str, name: str) -> dict | None:
 
         # Check for concentration in duration
         spell["concentration"] = "concentration" in spell["duration"].lower()
+
+        # Check for ritual — 2014 puts "(ritual)" in level line (already handled above),
+        # 2024 puts "or Ritual" in casting time
+        if not spell["ritual"] and "ritual" in spell["casting_time"].lower():
+            spell["ritual"] = True
 
         # === Parse description ===
         # Preserve HTML formatting (paragraphs, bold, etc.)
@@ -232,10 +307,10 @@ def parse_spell_html(html: str, name: str) -> dict | None:
             if text_lower.startswith("source:"):
                 continue
 
-            # Skip level/school line (in italics, short, contains school name)
-            # Must be a short line that's primarily the level/school info
-            if p.find("em") and len(text) < 50:
-                if "cantrip" in text_lower or re.match(r"^\d+(?:st|nd|rd|th)[- ]level", text_lower):
+            # Skip level/school line (detected by <em> tag containing level/school pattern)
+            if p.find("em"):
+                em_text = p.find("em").get_text(strip=True).lower()
+                if "cantrip" in em_text or re.search(r"(\d+)(?:st|nd|rd|th)[- ]level|level \d+", em_text):
                     continue
 
             # Skip stat block paragraph
@@ -243,7 +318,7 @@ def parse_spell_html(html: str, name: str) -> dict | None:
                 found_stat_block = True
                 continue
 
-            # Stop at class list (may be "Spell Lists." or "Spell Lists:" or "Spell List." etc.)
+            # Stop at class list — 2014 format has "Spell Lists." section at bottom
             if "spell list" in text_lower and p.find("a"):
                 # Extract classes from links
                 spell["classes"] = []
@@ -258,13 +333,13 @@ def parse_spell_html(html: str, name: str) -> dict | None:
             if found_spell_lists:
                 continue
 
-            # Check for "At Higher Levels" (with or without period)
-            if re.search(r"at higher levels\.?", text_lower):
-                # Get inner HTML, removing the "At Higher Levels." prefix
+            # Check for "At Higher Levels" (2014) or "Using a Higher-Level Spell Slot" (2024)
+            if re.search(r"at higher levels\.?", text_lower) or re.search(r"using a higher[- ]level spell slot\.?", text_lower):
                 inner_html = p.decode_contents()
-                # Remove the bold/italic "At Higher Levels." label
+                # Remove the bold/italic label — various HTML nesting orders
                 inner_html = re.sub(r"<strong>\s*<em>\s*At Higher Levels\.?\s*</em>\s*</strong>", "", inner_html, flags=re.IGNORECASE)
                 inner_html = re.sub(r"<em>\s*<strong>\s*At Higher Levels\.?\s*</strong>\s*</em>", "", inner_html, flags=re.IGNORECASE)
+                inner_html = re.sub(r"<strong>\s*Using a Higher[- ]Level Spell Slot\.?\s*</strong>", "", inner_html, flags=re.IGNORECASE)
                 at_higher_levels_html = inner_html.strip()
                 continue
 
@@ -280,15 +355,18 @@ def parse_spell_html(html: str, name: str) -> dict | None:
         spell["description"] = "\n".join(description_parts).strip()
         spell["at_higher_levels"] = at_higher_levels_html
 
-        # Fallback: if no classes found from Spell Lists, check page tags
+        # Assign classes — prefer Spell Lists section, then level line, then page tags
         if not spell.get("classes"):
-            spell["classes"] = []
-            tags_div = soup.find("div", class_="page-tags")
-            if tags_div:
-                for link in tags_div.find_all("a"):
-                    tag = link.get_text(strip=True).capitalize()
-                    if tag in SPELL_CLASSES:
-                        spell["classes"].append(tag)
+            if classes_from_level_line:
+                spell["classes"] = classes_from_level_line
+            else:
+                spell["classes"] = []
+                tags_div = soup.find("div", class_="page-tags")
+                if tags_div:
+                    for link in tags_div.find_all("a"):
+                        tag = link.get_text(strip=True).capitalize()
+                        if tag in SPELL_CLASSES:
+                            spell["classes"].append(tag)
 
         return spell
 
@@ -335,12 +413,18 @@ def scrape_all_spells(reparse_only: bool = False) -> list[dict]:
 
 def main():
     parser = argparse.ArgumentParser(description="Scrape D&D 5e spells from Wikidot")
+    parser.add_argument("--site", choices=["2014", "2024"], default="2014",
+                        help="Which site to scrape: 2014 (dnd5e.wikidot.com) or 2024 (dnd2024.wikidot.com)")
     parser.add_argument("--reparse", action="store_true",
                         help="Reparse from saved HTML files (no network requests)")
     args = parser.parse_args()
 
+    configure_site(args.site)
+
+    label = SITE_CONFIGS[args.site]["label"]
     print("=" * 50)
-    print("D&D 5e Spell Scraper")
+    print(f"D&D Spell Scraper — {label}")
+    print(f"Source: {BASE_URL}")
     print("=" * 50)
 
     if args.reparse:

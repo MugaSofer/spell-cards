@@ -1,8 +1,10 @@
 # Full spell data (not SRD-licensed, generate your own with the scraper)
 spells.json
+spells_2024.json
 
 # Scraped HTML cache
 raw_html/
+raw_html_2024/
 
 # Claude Code
 CLAUDE.md
