@@ -5,6 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>D&D 5e Spell Card Generator</title>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Alegreya:ital,wght@0,400;0,700;1,400;1,700&family=Alice&family=Almendra:ital,wght@0,400;0,700;1,400;1,700&family=Caudex:ital,wght@0,400;0,700;1,400;1,700&family=Cinzel:wght@400;700&family=Danfo&family=Grenze:ital,wght@0,400;0,700;1,400;1,700&family=Grenze+Gotisch:wght@400;700&family=Inknut+Antiqua:wght@400;700&family=MedievalSharp&family=Merriweather:ital,wght@0,400;0,700;1,400;1,700&family=Orbitron:wght@400;700&family=PT+Serif:ital,wght@0,400;0,700;1,400;1,700&family=Pirata+One&family=Texturina:ital,wght@0,400;0,700;1,400;1,700&family=Uncial+Antiqua&family=Vollkorn:ital,wght@0,400;0,700;1,400;1,700&family=Yusei+Magic&family=Zeyada&display=swap" rel="stylesheet">
     <style>
         :root {
             /* Card sizes */
@@ -745,7 +748,7 @@
             box-sizing: border-box;
             color: var(--back-color, #5c1d91);
         }
-        .card-back-ornament { font-size: 32pt; margin-bottom: 4px; line-height: 1; }
+        .card-back-ornament { font-size: 32pt; margin-bottom: 4px; line-height: 1.1; font-family: "Palatino Linotype", "Book Antiqua", Palatino, Georgia, serif; }
         .card-back-name { font-weight: bold; font-size: var(--font-name); text-align: center; }
         .card-back-info { font-size: var(--font-school); font-style: italic; color: #888; text-align: center; }
         .card-back-class { font-size: var(--font-footer); color: #999; text-align: center; margin-top: 2px; }
@@ -1024,8 +1027,43 @@
                             <option value="arcane">☽✦☾ Arcane</option>
                             <option value="diamond">◆◇◆ Diamond</option>
                             <option value="hedera">❧ Hedera</option>
+                            <option value="custom">Custom...</option>
                             <option value="none">None</option>
                         </select>
+                        <input type="text" id="backCustomOrnament" placeholder="Type symbol or text..." style="display:none; font-size:13px; width:140px; margin-top:3px; padding:2px 6px;">
+                        <div id="backCustomFontOptions" style="display:none; margin-top:4px;">
+                            <select id="backFont" style="font-size:13px; width:180px;">
+                                <option value="serif">Classic Serif</option>
+                                <option value="Alegreya">Alegreya</option>
+                                <option value="Alice">Alice</option>
+                                <option value="Almendra">Almendra</option>
+                                <option value="Caudex">Caudex</option>
+                                <option value="Cinzel">Cinzel</option>
+                                <option value="Danfo">Danfo</option>
+                                <option value="Grenze">Grenze</option>
+                                <option value="Grenze Gotisch">Grenze Gotisch</option>
+                                <option value="Inknut Antiqua">Inknut Antiqua</option>
+                                <option value="MedievalSharp">MedievalSharp</option>
+                                <option value="Merriweather">Merriweather</option>
+                                <option value="Orbitron">Orbitron</option>
+                                <option value="Pirata One">Pirata One</option>
+                                <option value="PT Serif">PT Serif</option>
+                                <option value="Texturina">Texturina</option>
+                                <option value="Uncial Antiqua">Uncial Antiqua</option>
+                                <option value="Vollkorn">Vollkorn</option>
+                                <option value="Yusei Magic">Yusei Magic</option>
+                                <option value="Zeyada">Zeyada</option>
+                            </select>
+                            <div style="margin-top:3px;">
+                                <label style="display:inline; margin-right:10px;"><input type="checkbox" id="backBold"> Bold</label>
+                                <label style="display:inline;"><input type="checkbox" id="backItalic"> Italic</label>
+                            </div>
+                        </div>
+                    </div>
+                    <div style="margin:4px 0;">
+                        <label for="backOrnamentSize">Ornament size:</label>
+                        <input type="number" id="backOrnamentSize" value="32" min="8" max="72" step="2" style="font-size:13px; width:50px; padding:2px 4px;">
+                        <span style="color:#999;">pt</span>
                     </div>
                     <div style="margin:4px 0;">
                         <label for="backFlip">Flip edge:</label>
@@ -1217,6 +1255,12 @@
         const backShowInfo = document.getElementById('backShowInfo');
         const backShowClass = document.getElementById('backShowClass');
         const backOrnament = document.getElementById('backOrnament');
+        const backCustomOrnament = document.getElementById('backCustomOrnament');
+        const backCustomFontOptions = document.getElementById('backCustomFontOptions');
+        const backFont = document.getElementById('backFont');
+        const backBold = document.getElementById('backBold');
+        const backItalic = document.getElementById('backItalic');
+        const backOrnamentSize = document.getElementById('backOrnamentSize');
         const backFlip = document.getElementById('backFlip');
 
         const defaultClassColors = {
@@ -1388,10 +1432,22 @@
                 arcane: '☽ ✦ ☾',
                 diamond: '◆ ◇ ◆',
                 hedera: '❧',
+                custom: backCustomOrnament.value.trim(),
             };
             const ornamentChar = ornaments[ornamentStyle];
+            const size = parseInt(backOrnamentSize.value) || 32;
+            let ornStyle = `font-size: ${size}pt;`;
+            if (ornamentStyle === 'custom') {
+                const fontVal = backFont.value;
+                const fontFamily = fontVal === 'serif'
+                    ? "'Palatino Linotype', 'Book Antiqua', Palatino, Georgia, serif"
+                    : `'${fontVal}', serif`;
+                ornStyle += ` font-family: ${fontFamily};`;
+                if (backBold.checked) ornStyle += ' font-weight: bold;';
+                if (backItalic.checked) ornStyle += ' font-style: italic;';
+            }
             const ornamentHTML = ornamentChar
-                ? `<div class="card-back-ornament">${ornamentChar}</div>` : '';
+                ? `<div class="card-back-ornament" style="${ornStyle}">${ornamentChar}</div>` : '';
 
             back.innerHTML = `
                 <div class="card-back-inner">
@@ -1469,6 +1525,23 @@
             if (cardsContainer.querySelectorAll('.spell-card').length > 0) {
                 generateCardBacks();
             }
+        });
+        backOrnament.addEventListener('change', () => {
+            const isCustom = backOrnament.value === 'custom';
+            backCustomOrnament.style.display = isCustom ? 'block' : 'none';
+            backCustomFontOptions.style.display = isCustom ? 'block' : 'none';
+        });
+        backCustomOrnament.addEventListener('input', () => {
+            if (cardBacksCheckbox.checked && cardsContainer.querySelectorAll('.spell-card').length > 0) {
+                generateCardBacks();
+            }
+        });
+        [backFont, backBold, backItalic, backOrnamentSize].forEach(el => {
+            el.addEventListener('change', () => {
+                if (cardBacksCheckbox.checked && cardsContainer.querySelectorAll('.spell-card').length > 0) {
+                    generateCardBacks();
+                }
+            });
         });
         [backShowName, backShowInfo, backShowClass, backOrnament, backFlip].forEach(el => {
             el.addEventListener('change', () => {
