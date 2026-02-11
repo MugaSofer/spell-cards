@@ -12,6 +12,7 @@ A free web tool for generating printable spell cards for D&D 5th Edition.
 - **Adjustable font sizes** for readability vs. content density
 - **Print-optimized** layout with cut guides and automatic page breaks
 - **Save & load** spell lists in your browser
+- **Create custom spells** directly in the browser with Markdown formatting support
 - **Load your own data** — bring a complete spell list with the included scraper tool
 
 ## Custom Spell Data
@@ -25,7 +26,7 @@ The site ships with spells from the [SRD 5.1](https://media.wizards.com/2016/dow
 - Multi-card splitting for long spell descriptions instead of truncating
 - Filter by school of magic or source book
 - Alternative color-coding options
-- Custom spell entry form (no JSON needed)
+- ~~Custom spell entry form (no JSON needed)~~ Done!
 - Card backs for double-sided printing
 - PDF export
 

@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>D&D 5e Spell Card Generator</title>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <style>
         :root {
             /* Card sizes */
@@ -537,6 +538,90 @@
         .spell-card[data-school="Transmutation"] { border-color: var(--school-transmutation); }
         .spell-card[data-school="Transmutation"] .card-level { background: var(--school-transmutation); }
 
+        /* ===== CUSTOM SPELL FORM ===== */
+        .custom-spell-panel {
+            margin-top: 20px;
+            border-top: 1px solid #eee;
+            padding-top: 15px;
+        }
+
+        .custom-spell-panel .toggle-btn {
+            width: 100%;
+            text-align: center;
+        }
+
+        .custom-spell-form {
+            display: none;
+            margin-top: 15px;
+        }
+
+        .custom-spell-form.active {
+            display: block;
+        }
+
+        .custom-spell-form .form-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+
+        .custom-spell-form .form-full {
+            grid-column: 1 / -1;
+        }
+
+        .custom-spell-form textarea {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+            font-family: inherit;
+            resize: vertical;
+            min-height: 80px;
+        }
+
+        .custom-spell-form textarea:focus {
+            outline: none;
+            border-color: #3498db;
+        }
+
+        .custom-spell-form .hint {
+            font-size: 12px;
+            color: #999;
+            margin-top: 2px;
+        }
+
+        .custom-spell-form .class-checkboxes {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .custom-spell-form .class-checkboxes label {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            padding: 4px 8px;
+            background: #f0f0f0;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: normal;
+        }
+
+        .custom-spell-form .inline-checks {
+            display: flex;
+            gap: 16px;
+        }
+
+        .custom-spell-form .inline-checks label {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            font-weight: normal;
+            cursor: pointer;
+        }
+
         /* ===== PRINT STYLES ===== */
         @media print {
             body {
@@ -708,6 +793,96 @@
         <div class="button-row" style="margin-top: 10px;">
             <button id="saveList" class="secondary">Save Spell List</button>
             <button id="loadList" class="secondary">Load Spell List</button>
+        </div>
+
+        <div class="custom-spell-panel">
+            <button class="toggle-btn" id="toggleCustomSpell">Create Custom Spell</button>
+            <div class="custom-spell-form" id="customSpellForm">
+                <div class="form-grid">
+                    <div class="control-group">
+                        <label for="csName">Spell Name *</label>
+                        <input type="text" id="csName" placeholder="e.g. Eldritch Blast">
+                    </div>
+                    <div class="control-group">
+                        <label for="csLevel">Level</label>
+                        <select id="csLevel">
+                            <option value="0">Cantrip</option>
+                            <option value="1">1st</option>
+                            <option value="2">2nd</option>
+                            <option value="3">3rd</option>
+                            <option value="4">4th</option>
+                            <option value="5">5th</option>
+                            <option value="6">6th</option>
+                            <option value="7">7th</option>
+                            <option value="8">8th</option>
+                            <option value="9">9th</option>
+                        </select>
+                    </div>
+                    <div class="control-group">
+                        <label for="csSchool">School</label>
+                        <select id="csSchool">
+                            <option value="Abjuration">Abjuration</option>
+                            <option value="Conjuration">Conjuration</option>
+                            <option value="Divination">Divination</option>
+                            <option value="Enchantment">Enchantment</option>
+                            <option value="Evocation" selected>Evocation</option>
+                            <option value="Illusion">Illusion</option>
+                            <option value="Necromancy">Necromancy</option>
+                            <option value="Transmutation">Transmutation</option>
+                        </select>
+                    </div>
+                    <div class="control-group">
+                        <label for="csCastingTime">Casting Time</label>
+                        <input type="text" id="csCastingTime" value="1 action">
+                    </div>
+                    <div class="control-group">
+                        <label for="csRange">Range</label>
+                        <input type="text" id="csRange" value="Touch">
+                    </div>
+                    <div class="control-group">
+                        <label for="csComponents">Components</label>
+                        <input type="text" id="csComponents" placeholder="e.g. V, S, M (a pinch of dust)">
+                    </div>
+                    <div class="control-group">
+                        <label for="csDuration">Duration</label>
+                        <input type="text" id="csDuration" value="Instantaneous">
+                    </div>
+                    <div class="control-group">
+                        <label>Properties</label>
+                        <div class="inline-checks">
+                            <label><input type="checkbox" id="csConcentration"> Concentration</label>
+                            <label><input type="checkbox" id="csRitual"> Ritual</label>
+                        </div>
+                    </div>
+                    <div class="control-group form-full">
+                        <label>Classes</label>
+                        <div class="class-checkboxes">
+                            <label><input type="checkbox" value="Artificer"><span>Artificer</span></label>
+                            <label><input type="checkbox" value="Bard"><span>Bard</span></label>
+                            <label><input type="checkbox" value="Cleric"><span>Cleric</span></label>
+                            <label><input type="checkbox" value="Druid"><span>Druid</span></label>
+                            <label><input type="checkbox" value="Paladin"><span>Paladin</span></label>
+                            <label><input type="checkbox" value="Ranger"><span>Ranger</span></label>
+                            <label><input type="checkbox" value="Sorcerer"><span>Sorcerer</span></label>
+                            <label><input type="checkbox" value="Warlock"><span>Warlock</span></label>
+                            <label><input type="checkbox" value="Wizard"><span>Wizard</span></label>
+                        </div>
+                    </div>
+                    <div class="control-group form-full">
+                        <label for="csDescription">Description *</label>
+                        <textarea id="csDescription" rows="4" placeholder="Describe what the spell does..."></textarea>
+                        <div class="hint">Supports Markdown: **bold**, *italic*, - lists</div>
+                    </div>
+                    <div class="control-group form-full">
+                        <label for="csHigherLevels">At Higher Levels</label>
+                        <textarea id="csHigherLevels" rows="2" placeholder="Optional: scaling when cast at higher levels"></textarea>
+                    </div>
+                </div>
+                <div class="button-row">
+                    <button id="addCustomSpell">Add Spell</button>
+                    <button id="cancelCustomSpell" class="secondary">Cancel</button>
+                </div>
+            </div>
         </div>
 
         <div class="selected-spells">
@@ -1132,6 +1307,106 @@
 
         // Make removeSpell global for onclick handlers
         window.removeSpell = removeSpell;
+
+        // ===== CUSTOM SPELL ENTRY =====
+        const customSpellForm = document.getElementById('customSpellForm');
+
+        document.getElementById('toggleCustomSpell').addEventListener('click', () => {
+            customSpellForm.classList.toggle('active');
+        });
+
+        document.getElementById('cancelCustomSpell').addEventListener('click', () => {
+            customSpellForm.classList.remove('active');
+        });
+
+        // Load saved custom spells on startup
+        function loadCustomSpells() {
+            try {
+                const saved = JSON.parse(localStorage.getItem('customSpells') || '[]');
+                saved.forEach(spell => {
+                    if (!allSpells.find(s => s.name === spell.name)) {
+                        allSpells.push(spell);
+                    }
+                });
+            } catch (e) { /* ignore bad data */ }
+        }
+
+        function saveCustomSpells() {
+            const custom = allSpells.filter(s => s.source === 'Custom');
+            localStorage.setItem('customSpells', JSON.stringify(custom));
+        }
+
+        // Restore custom spells after default data loads
+        const origTryLoad = tryLoadDefaultSpells;
+        tryLoadDefaultSpells = async function() {
+            await origTryLoad();
+            loadCustomSpells();
+        };
+        // Re-run since we just replaced it after it already ran
+        loadCustomSpells();
+
+        document.getElementById('addCustomSpell').addEventListener('click', () => {
+            const name = document.getElementById('csName').value.trim();
+            if (!name) {
+                showStatus('Please enter a spell name', 'error');
+                return;
+            }
+
+            const description = document.getElementById('csDescription').value.trim();
+            if (!description) {
+                showStatus('Please enter a spell description', 'error');
+                return;
+            }
+
+            // Check for duplicates
+            const existing = allSpells.find(s => s.name === name);
+            if (existing) {
+                if (!confirm(`A spell named "${name}" already exists. Replace it?`)) {
+                    return;
+                }
+                // Remove the old one
+                const idx = allSpells.indexOf(existing);
+                allSpells.splice(idx, 1);
+            }
+
+            // Get selected classes
+            const classes = Array.from(
+                document.querySelectorAll('.class-checkboxes input:checked')
+            ).map(cb => cb.value);
+
+            // Build spell object
+            const spell = {
+                name: name,
+                source: 'Custom',
+                level: parseInt(document.getElementById('csLevel').value),
+                school: document.getElementById('csSchool').value,
+                ritual: document.getElementById('csRitual').checked,
+                casting_time: document.getElementById('csCastingTime').value.trim() || '1 action',
+                range: document.getElementById('csRange').value.trim() || 'Touch',
+                components: document.getElementById('csComponents').value.trim(),
+                duration: document.getElementById('csDuration').value.trim() || 'Instantaneous',
+                concentration: document.getElementById('csConcentration').checked,
+                classes: classes,
+                description: marked.parse(description),
+                at_higher_levels: marked.parse(document.getElementById('csHigherLevels').value.trim() || '')
+            };
+
+            allSpells.push(spell);
+            addSpell(spell.name);
+            saveCustomSpells();
+
+            // Reset form
+            document.getElementById('csName').value = '';
+            document.getElementById('csDescription').value = '';
+            document.getElementById('csHigherLevels').value = '';
+            document.getElementById('csComponents').value = '';
+            document.getElementById('csConcentration').checked = false;
+            document.getElementById('csRitual').checked = false;
+            document.querySelectorAll('.class-checkboxes input:checked').forEach(cb => cb.checked = false);
+
+            customSpellForm.classList.remove('active');
+            showStatus(`Added custom spell "${spell.name}"`, 'success');
+        });
     </script>
 </body>
 </html>
