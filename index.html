@@ -46,20 +46,45 @@
         }
 
         /* Card size presets */
+        .size-bridge {
+            --card-width: 2.25in;
+            --card-height: 3.5in;
+            --card-padding: 0.1in;
+        }
         .size-poker {
             --card-width: 2.5in;
             --card-height: 3.5in;
             --card-padding: 0.12in;
+        }
+        .size-max6 {
+            --card-width: 2.6in;
+            --card-height: 5.25in;
+            --card-padding: 0.15in;
         }
         .size-tarot {
             --card-width: 2.75in;
             --card-height: 4.75in;
             --card-padding: 0.15in;
         }
+        .size-a7 {
+            --card-width: 2.9in;
+            --card-height: 4.1in;
+            --card-padding: 0.15in;
+        }
         .size-index {
             --card-width: 3in;
             --card-height: 5in;
             --card-padding: 0.18in;
+        }
+        .size-max6w {
+            --card-width: 4in;
+            --card-height: 3.4in;
+            --card-padding: 0.15in;
+        }
+        .size-max4 {
+            --card-width: 4in;
+            --card-height: 5.25in;
+            --card-padding: 0.2in;
         }
         .size-large {
             --card-width: 4in;
@@ -712,14 +737,11 @@
                 padding: 0;
             }
 
-            /* Poker: 3×3 = 9/page */
-            .cards-container.size-poker {
+            /* 3-column sizes: Bridge 9/page, Poker 9/page, Max6 6/page */
+            .cards-container.size-bridge,
+            .cards-container.size-poker,
+            .cards-container.size-max6 {
                 grid-template-columns: repeat(3, var(--card-width));
-            }
-
-            /* Large: 2×1 = 2/page */
-            .cards-container.size-large {
-                grid-template-columns: repeat(2, var(--card-width));
             }
 
             .spell-card {
@@ -855,10 +877,15 @@
             <div class="control-group">
                 <label for="cardSize">Card Size</label>
                 <select id="cardSize">
-                    <option value="poker">Poker (2.5" × 3.5") - 9/page</option>
-                    <option value="tarot" selected>Tarot (2.75" × 4.75") - 4/page</option>
-                    <option value="index">Index (3" × 5") - 4/page</option>
-                    <option value="large">Large (4" × 6") - 2/page</option>
+                    <option value="poker" selected>Poker (2.5" × 3.5") — 9/page</option>
+                    <option value="bridge">Bridge (2.25" × 3.5") — 9/page</option>
+                    <option value="max6">Tall (2.6" × 5.25") — 6/page</option>
+                    <option value="max6w">Wide (4" × 3.4") — 6/page</option>
+                    <option value="tarot">Tarot (2.75" × 4.75") — 4/page</option>
+                    <option value="a7">A7 (2.9" × 4.1") — 4/page</option>
+                    <option value="index">Small Index (3" × 5") — 4/page</option>
+                    <option value="max4">Max 4/page (4" × 5.25")</option>
+                    <option value="large">Large Index (4" × 6") — 2/page</option>
                 </select>
             </div>
 
