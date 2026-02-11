@@ -10,9 +10,10 @@ A free web tool for generating printable spell cards for D&D 5th Edition.
 - **Filter** by class, spell level, school of magic, or source book
 - **Color-coding modes**: By School, By Spell Level, By Class (highlight mode), or Monochrome — with customizable class color palette
 - **Multi-card splitting** for long spell descriptions instead of truncating
-- **Multiple card sizes**: Poker, Tarot, Index, and Large
+- **8 card sizes**: Poker, Bridge, Tarot, A7, Small Index, Large Index, plus Tall and Wide maximized layouts
 - **Adjustable font sizes** for readability vs. content density
-- **Print-optimized** layout with cut guides and automatic page breaks
+- **Card backs** for duplex printing — with ornament picker, 20 Google Fonts, custom text, and live preview
+- **Print-optimized** layout with cut guides, tight margins, and correct cards-per-page for every size
 - **Share spell lists** via URL, clipboard text, or JSON export/import
 - **Save & load** spell lists in your browser
 - **Create custom spells** directly in the browser with Markdown formatting support
@@ -25,13 +26,13 @@ The site ships with spells from the [SRD 5.1](https://media.wizards.com/2016/dow
 ## Planned Features
 
 **Card generation:**
-- Optimized print layouts (less wasted white space)
+- ~~Optimized print layouts (less wasted white space)~~ Done!
 - ~~Multi-card splitting for long spell descriptions~~ Done!
 - ~~Filter by school of magic or source book~~ Done!
 - ~~Alternative color-coding options~~ Done!
 - ~~Custom spell entry form (no JSON needed)~~ Done!
-- Card backs for double-sided printing
-- PDF export
+- ~~Card backs for double-sided printing~~ Done!
+- ~~PDF export~~ Use "Save as PDF" in your browser's print dialog
 
 **Sharing & portability:**
 - ~~Shareable spell list URLs~~ Done!
