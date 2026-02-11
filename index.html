@@ -717,6 +717,43 @@
             cursor: pointer;
         }
 
+        /* ===== CARD BACKS ===== */
+        .card-back {
+            width: var(--card-width);
+            height: var(--card-height);
+            border: 2px solid var(--back-color, #5c1d91);
+            border-radius: var(--border-radius);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: white;
+            position: relative;
+            overflow: hidden;
+            box-sizing: border-box;
+        }
+        .card-back-inner {
+            border: 1px solid var(--back-color, #5c1d91);
+            border-radius: calc(var(--border-radius) - 6px);
+            padding: 12px;
+            margin: 8px;
+            width: calc(100% - 16px);
+            height: calc(100% - 16px);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            box-sizing: border-box;
+            color: var(--back-color, #5c1d91);
+        }
+        .card-back-ornament { font-size: 24pt; margin-bottom: 6px; }
+        .card-back-name { font-weight: bold; font-size: var(--font-name); text-align: center; }
+        .card-back-info { font-size: var(--font-school); font-style: italic; color: #888; text-align: center; }
+        .card-spacer { width: var(--card-width); height: var(--card-height); }
+
+        /* Page wrappers - invisible on screen */
+        .front-page { display: contents; }
+        .back-page { display: none; }
+
         /* ===== PRINT STYLES ===== */
         @media print {
             body {
@@ -761,11 +798,47 @@
                 border-radius: calc(var(--border-radius) + 2px);
                 pointer-events: none;
             }
+
+            /* Page wrappers for duplex printing */
+            .cards-container.has-backs {
+                display: block;
+            }
+
+            .front-page, .back-page {
+                display: grid;
+                grid-template-columns: repeat(2, var(--card-width));
+                gap: 0.1in;
+                justify-content: center;
+                break-after: page;
+            }
+
+            .size-bridge .front-page, .size-bridge .back-page,
+            .size-poker .front-page, .size-poker .back-page,
+            .size-max6 .front-page, .size-max6 .back-page {
+                grid-template-columns: repeat(3, var(--card-width));
+            }
+
+            .card-back {
+                margin: 0;
+                box-shadow: none;
+            }
+
+            .card-back::before {
+                content: '';
+                position: absolute;
+                top: -2px;
+                left: -2px;
+                right: -2px;
+                bottom: -2px;
+                border: 1px dashed #ccc;
+                border-radius: calc(var(--border-radius) + 2px);
+                pointer-events: none;
+            }
         }
 
         @page {
             size: letter;
-            margin: 0.15in;
+            margin: 0.1in;
         }
 
         /* Loading indicator */
@@ -933,6 +1006,29 @@
                     <option value="truncate" selected>Truncate</option>
                     <option value="split">Split across cards</option>
                 </select>
+            </div>
+
+            <div class="control-group">
+                <label><input type="checkbox" id="cardBacks"> Card Backs (duplex printing)</label>
+                <div id="cardBackOptions" style="display:none; margin-top:6px; font-size:13px;">
+                    <label style="display:block; margin:3px 0;"><input type="checkbox" id="backShowName" checked> Show spell name</label>
+                    <label style="display:block; margin:3px 0;"><input type="checkbox" id="backShowInfo" checked> Show school & level</label>
+                    <div style="margin:4px 0;">
+                        <label for="backOrnament">Ornament:</label>
+                        <select id="backOrnament" style="font-size:13px;">
+                            <option value="simple">✦ Simple</option>
+                            <option value="ornate">❖ Ornate</option>
+                            <option value="none">None</option>
+                        </select>
+                    </div>
+                    <div style="margin:4px 0;">
+                        <label for="backFlip">Flip edge:</label>
+                        <select id="backFlip" style="font-size:13px;">
+                            <option value="long">Long edge</option>
+                            <option value="short">Short edge</option>
+                        </select>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -1109,6 +1205,12 @@
         const customizeLink = document.getElementById('customizeClassColors');
         const colorModal = document.getElementById('colorModal');
         const colorPickerGrid = document.getElementById('colorPickerGrid');
+        const cardBacksCheckbox = document.getElementById('cardBacks');
+        const cardBackOptions = document.getElementById('cardBackOptions');
+        const backShowName = document.getElementById('backShowName');
+        const backShowInfo = document.getElementById('backShowInfo');
+        const backOrnament = document.getElementById('backOrnament');
+        const backFlip = document.getElementById('backFlip');
 
         const defaultClassColors = {
             Artificer: '#795548', Bard: '#e91e63', Cleric: '#ffd54f',
@@ -1196,7 +1298,10 @@
                 cardsContainer.style.removeProperty('--other-color');
             }
 
-            requestAnimationFrame(() => adjustCardOverflow());
+            requestAnimationFrame(() => {
+                adjustCardOverflow();
+                generateCardBacks();
+            });
         }
 
         cardSizeSelect.addEventListener('change', updateCardStyles);
@@ -1212,8 +1317,148 @@
 
         overflowModeSelect.addEventListener('change', () => {
             if (cardsContainer.children.length > 0) {
-                requestAnimationFrame(() => adjustCardOverflow());
+                requestAnimationFrame(() => {
+                    adjustCardOverflow();
+                    generateCardBacks();
+                });
             }
+        });
+
+        // ===== CARD BACKS =====
+        const pageLayouts = {
+            bridge: { cols: 3, rows: 3, perPage: 9 },
+            poker:  { cols: 3, rows: 3, perPage: 9 },
+            max6:   { cols: 3, rows: 2, perPage: 6 },
+            max6w:  { cols: 2, rows: 3, perPage: 6 },
+            tarot:  { cols: 2, rows: 2, perPage: 4 },
+            a7:     { cols: 2, rows: 2, perPage: 4 },
+            index:  { cols: 2, rows: 2, perPage: 4 },
+            max4:   { cols: 2, rows: 2, perPage: 4 },
+            large:  { cols: 2, rows: 1, perPage: 2 },
+        };
+
+        function mirrorOrder(cards, cols, rows, flipMode) {
+            const padded = [...cards];
+            while (padded.length < cols * rows) padded.push(null);
+            const grid = [];
+            for (let r = 0; r < rows; r++) {
+                grid.push(padded.slice(r * cols, (r + 1) * cols));
+            }
+            if (flipMode === 'long') {
+                grid.forEach(row => row.reverse());
+            } else {
+                grid.reverse();
+            }
+            return grid.flat();
+        }
+
+        function createCardBack(frontCard) {
+            const back = document.createElement('div');
+            back.className = 'card-back';
+
+            const name = frontCard.querySelector('.card-name')?.textContent || '';
+            const levelEl = frontCard.querySelector('.card-level');
+            const schoolEl = frontCard.querySelector('.card-school');
+            const levelText = levelEl ? levelEl.textContent : '';
+            const schoolText = schoolEl ? schoolEl.textContent : '';
+            const info = schoolText || levelText;
+
+            const borderColor = getComputedStyle(frontCard).borderTopColor;
+            back.style.setProperty('--back-color', borderColor);
+
+            const showName = backShowName.checked;
+            const showInfo = backShowInfo.checked;
+            const ornamentStyle = backOrnament.value;
+
+            let ornamentHTML = '';
+            if (ornamentStyle === 'simple') {
+                ornamentHTML = '<div class="card-back-ornament">✦</div>';
+            } else if (ornamentStyle === 'ornate') {
+                ornamentHTML = '<div class="card-back-ornament">❖ ⚜ ❖</div>';
+            }
+
+            back.innerHTML = `
+                <div class="card-back-inner">
+                    ${ornamentHTML}
+                    ${showName ? `<div class="card-back-name">${name}</div>` : ''}
+                    ${showInfo ? `<div class="card-back-info">${info}</div>` : ''}
+                </div>
+            `;
+
+            return back;
+        }
+
+        function generateCardBacks() {
+            // Collect all spell cards (may be inside wrappers from previous run)
+            const allCards = Array.from(cardsContainer.querySelectorAll('.spell-card'));
+
+            // Remove existing wrappers and backs
+            cardsContainer.querySelectorAll('.front-page, .back-page, .card-spacer').forEach(el => el.remove());
+
+            // Re-append cards flat
+            allCards.forEach(card => cardsContainer.appendChild(card));
+
+            if (!cardBacksCheckbox.checked || allCards.length === 0) {
+                cardsContainer.classList.remove('has-backs');
+                return;
+            }
+            cardsContainer.classList.add('has-backs');
+
+            const layout = pageLayouts[cardSizeSelect.value] || pageLayouts.poker;
+            const flipMode = backFlip.value;
+
+            // Group cards into pages
+            const pages = [];
+            for (let i = 0; i < allCards.length; i += layout.perPage) {
+                pages.push(allCards.slice(i, i + layout.perPage));
+            }
+
+            // Rebuild container with interleaved front/back pages
+            cardsContainer.innerHTML = '';
+
+            pages.forEach(pageFronts => {
+                // Front page
+                const frontPage = document.createElement('div');
+                frontPage.className = 'front-page';
+                pageFronts.forEach(card => frontPage.appendChild(card));
+                // Pad incomplete pages with spacers
+                for (let i = pageFronts.length; i < layout.perPage; i++) {
+                    const spacer = document.createElement('div');
+                    spacer.className = 'card-spacer';
+                    frontPage.appendChild(spacer);
+                }
+                cardsContainer.appendChild(frontPage);
+
+                // Back page with mirrored order
+                const backPage = document.createElement('div');
+                backPage.className = 'back-page';
+                const mirrored = mirrorOrder(pageFronts, layout.cols, layout.rows, flipMode);
+                mirrored.forEach(frontCard => {
+                    if (frontCard) {
+                        backPage.appendChild(createCardBack(frontCard));
+                    } else {
+                        const spacer = document.createElement('div');
+                        spacer.className = 'card-spacer';
+                        backPage.appendChild(spacer);
+                    }
+                });
+                cardsContainer.appendChild(backPage);
+            });
+        }
+
+        // Card backs event listeners
+        cardBacksCheckbox.addEventListener('change', () => {
+            cardBackOptions.style.display = cardBacksCheckbox.checked ? 'block' : 'none';
+            if (cardsContainer.querySelectorAll('.spell-card').length > 0) {
+                generateCardBacks();
+            }
+        });
+        [backShowName, backShowInfo, backOrnament, backFlip].forEach(el => {
+            el.addEventListener('change', () => {
+                if (cardBacksCheckbox.checked && cardsContainer.querySelectorAll('.spell-card').length > 0) {
+                    generateCardBacks();
+                }
+            });
         });
 
         // ===== CLASS COLOR CUSTOMIZATION MODAL =====
@@ -1870,7 +2115,12 @@
             if (cardsContainer.children.length === 0) {
                 generateCards();
             }
-            window.print();
+            // Delay print to let rAF callbacks (card backs, overflow) finish
+            requestAnimationFrame(() => {
+                requestAnimationFrame(() => {
+                    window.print();
+                });
+            });
         });
 
         // Make removeSpell global for onclick handlers
