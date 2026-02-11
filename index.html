@@ -700,29 +700,26 @@
                 margin: 0;
             }
 
-            .ui-container {
+            .ui-container, footer {
                 display: none !important;
             }
 
             .cards-container {
                 display: grid;
                 grid-template-columns: repeat(2, var(--card-width));
-                grid-auto-rows: var(--card-height);
-                gap: 0.2in;
+                gap: 0.1in;
                 justify-content: center;
-                padding: 0.3in;
+                padding: 0;
             }
 
-            /* Poker cards: 3 columns */
+            /* Poker: 3×3 = 9/page */
             .cards-container.size-poker {
                 grid-template-columns: repeat(3, var(--card-width));
             }
 
-            /* Large cards: 2 columns, might need smaller gap */
+            /* Large: 2×1 = 2/page */
             .cards-container.size-large {
                 grid-template-columns: repeat(2, var(--card-width));
-                gap: 0.15in;
-                padding: 0.2in;
             }
 
             .spell-card {
@@ -746,7 +743,7 @@
 
         @page {
             size: letter;
-            margin: 0.25in;
+            margin: 0.15in;
         }
 
         /* Loading indicator */
@@ -859,7 +856,7 @@
                 <label for="cardSize">Card Size</label>
                 <select id="cardSize">
                     <option value="poker">Poker (2.5" × 3.5") - 9/page</option>
-                    <option value="tarot" selected>Tarot (2.75" × 4.75") - 6/page</option>
+                    <option value="tarot" selected>Tarot (2.75" × 4.75") - 4/page</option>
                     <option value="index">Index (3" × 5") - 4/page</option>
                     <option value="large">Large (4" × 6") - 2/page</option>
                 </select>
