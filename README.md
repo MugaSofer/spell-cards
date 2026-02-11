@@ -7,7 +7,9 @@ A free web tool for generating printable spell cards for D&D 5th Edition.
 ## Features
 
 - **319 SRD spells** included out of the box, covering all levels and most classes
-- **Filter** by class and spell level, or search for individual spells
+- **Filter** by class, spell level, school of magic, or source book
+- **Color-coding modes**: By School, By Spell Level, By Class (highlight mode), or Monochrome — with customizable class color palette
+- **Multi-card splitting** for long spell descriptions instead of truncating
 - **Multiple card sizes**: Poker, Tarot, Index, and Large
 - **Adjustable font sizes** for readability vs. content density
 - **Print-optimized** layout with cut guides and automatic page breaks
@@ -23,9 +25,9 @@ The site ships with spells from the [SRD 5.1](https://media.wizards.com/2016/dow
 
 **Card generation:**
 - Optimized print layouts (less wasted white space)
-- Multi-card splitting for long spell descriptions instead of truncating
-- Filter by school of magic or source book
-- Alternative color-coding options
+- ~~Multi-card splitting for long spell descriptions~~ Done!
+- ~~Filter by school of magic or source book~~ Done!
+- ~~Alternative color-coding options~~ Done!
 - ~~Custom spell entry form (no JSON needed)~~ Done!
 - Card backs for double-sided printing
 - PDF export

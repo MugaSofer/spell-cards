@@ -876,6 +876,7 @@
                     <option value="class">By Class</option>
                     <option value="mono">Monochrome</option>
                 </select>
+                <a href="#" id="customizeClassColors" style="font-size:12px; color:#3498db; display:none;">Customize colors...</a>
                 <div id="colorClassInfo" style="display:none; font-size:12px; color:#666; line-height:1.4;">
                     <span id="colorClassMsg"></span>
                     <span id="colorClassOtherWrap" style="display:none;">
@@ -1032,6 +1033,18 @@
         </p>
     </footer>
 
+    <!-- Class Color Customization Modal -->
+    <div id="colorModal" style="display:none; position:fixed; inset:0; z-index:1000; background:rgba(0,0,0,0.5); align-items:center; justify-content:center;">
+        <div style="background:white; border-radius:8px; padding:24px; max-width:360px; width:90%; box-shadow:0 4px 20px rgba(0,0,0,0.3);">
+            <h3 style="margin:0 0 16px; color:#333;">Class Colors</h3>
+            <div id="colorPickerGrid" style="display:grid; grid-template-columns:1fr 1fr; gap:10px 20px;"></div>
+            <div style="margin-top:16px; display:flex; gap:10px; justify-content:space-between;">
+                <button id="resetClassColors" class="secondary" style="font-size:13px;">Reset to defaults</button>
+                <button id="closeColorModal" style="font-size:13px;">Done</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         // Global state
         let allSpells = [];
@@ -1057,12 +1070,20 @@
         const colorClassMsg = document.getElementById('colorClassMsg');
         const colorClassOtherWrap = document.getElementById('colorClassOtherWrap');
         const otherClassColor = document.getElementById('otherClassColor');
+        const customizeLink = document.getElementById('customizeClassColors');
+        const colorModal = document.getElementById('colorModal');
+        const colorPickerGrid = document.getElementById('colorPickerGrid');
 
-        const classColors = {
+        const defaultClassColors = {
             Artificer: '#795548', Bard: '#e91e63', Cleric: '#ffd54f',
             Druid: '#4caf50', Paladin: '#ffb300', Ranger: '#66bb6a',
             Sorcerer: '#e74c3c', Warlock: '#9c27b0', Wizard: '#3498db'
         };
+        let classColors = Object.assign({}, defaultClassColors);
+        try {
+            const saved = JSON.parse(localStorage.getItem('classColors'));
+            if (saved) Object.assign(classColors, saved);
+        } catch (e) { /* ignore */ }
 
         // Apply card size, font size, and color mode classes
         function updateCardStyles() {
@@ -1079,6 +1100,8 @@
             document.querySelectorAll('.spell-card[data-highlighted]').forEach(card => {
                 card.removeAttribute('data-highlighted');
             });
+
+            customizeLink.style.display = colorMode === 'class' ? 'inline' : 'none';
 
             if (colorMode === 'class') {
                 const cls = classSelect.value;
@@ -1155,6 +1178,47 @@
             if (cardsContainer.children.length > 0) {
                 requestAnimationFrame(() => adjustCardOverflow());
             }
+        });
+
+        // ===== CLASS COLOR CUSTOMIZATION MODAL =====
+        function populateColorPickers() {
+            colorPickerGrid.innerHTML = Object.keys(defaultClassColors).map(cls => `
+                <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
+                    <input type="color" value="${classColors[cls]}" data-class="${cls}"
+                           style="width:32px; height:24px; border:1px solid #ccc; border-radius:3px; padding:0; cursor:pointer;">
+                    <span style="font-size:14px;">${cls}</span>
+                </label>
+            `).join('');
+        }
+
+        customizeLink.addEventListener('click', (e) => {
+            e.preventDefault();
+            populateColorPickers();
+            colorModal.style.display = 'flex';
+        });
+
+        document.getElementById('closeColorModal').addEventListener('click', () => {
+            colorModal.style.display = 'none';
+        });
+
+        colorModal.addEventListener('click', (e) => {
+            if (e.target === colorModal) colorModal.style.display = 'none';
+        });
+
+        colorPickerGrid.addEventListener('input', (e) => {
+            if (e.target.type === 'color') {
+                const cls = e.target.dataset.class;
+                classColors[cls] = e.target.value;
+                localStorage.setItem('classColors', JSON.stringify(classColors));
+                updateCardStyles();
+            }
+        });
+
+        document.getElementById('resetClassColors').addEventListener('click', () => {
+            Object.assign(classColors, defaultClassColors);
+            localStorage.removeItem('classColors');
+            populateColorPickers();
+            updateCardStyles();
         });
 
         // Initialize with default styles
