@@ -752,6 +752,10 @@
         .card-back-name { font-weight: bold; font-size: var(--font-name); text-align: center; }
         .card-back-info { font-size: var(--font-school); font-style: italic; color: #888; text-align: center; }
         .card-back-class { font-size: var(--font-footer); color: #999; text-align: center; margin-top: 2px; }
+
+        #backPreview .card-back {
+            transform-origin: top center;
+        }
         .card-spacer { width: var(--card-width); height: var(--card-height); }
 
         /* Page wrappers - invisible on screen */
@@ -1072,6 +1076,10 @@
                             <option value="short">Short edge</option>
                         </select>
                     </div>
+                    <div style="margin:8px 0 4px;">
+                        <label style="font-size:12px; color:#888;">Preview:</label>
+                        <div id="backPreview" style="margin-top:4px; display:flex; justify-content:center;"></div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -1261,6 +1269,7 @@
         const backBold = document.getElementById('backBold');
         const backItalic = document.getElementById('backItalic');
         const backOrnamentSize = document.getElementById('backOrnamentSize');
+        const backPreview = document.getElementById('backPreview');
         const backFlip = document.getElementById('backFlip');
 
         const defaultClassColors = {
@@ -1461,6 +1470,50 @@
             return back;
         }
 
+        function updateBackPreview() {
+            backPreview.innerHTML = '';
+            if (!cardBacksCheckbox.checked) return;
+
+            // Create a wrapper with the current size class so CSS variables are available
+            const wrapper = document.createElement('div');
+            wrapper.className = `size-${cardSizeSelect.value} font-${fontSizeSelect.value}`;
+            wrapper.style.display = 'inline-block';
+
+            // Use a real card if available, or build a fake one
+            const sampleCard = cardsContainer.querySelector('.spell-card');
+            let previewBack;
+            if (sampleCard) {
+                previewBack = createCardBack(sampleCard);
+            } else {
+                // Fake front card with sample data
+                const fake = document.createElement('div');
+                fake.innerHTML = `
+                    <span class="card-name">Fireball</span>
+                    <span class="card-level">3</span>
+                    <span class="card-school">3rd-level Evocation</span>
+                    <span class="card-classes">Sorcerer, Wizard</span>
+                `;
+                fake.style.borderColor = '#e74c3c';
+                fake.style.display = 'none';
+                document.body.appendChild(fake);
+                previewBack = createCardBack(fake);
+                fake.remove();
+            }
+
+            wrapper.appendChild(previewBack);
+            backPreview.appendChild(wrapper);
+
+            // Scale to fit within ~180px wide
+            const cardW = previewBack.offsetWidth;
+            const cardH = previewBack.offsetHeight;
+            if (cardW > 0) {
+                const scale = Math.min(1, 180 / cardW);
+                wrapper.style.transform = `scale(${scale})`;
+                wrapper.style.transformOrigin = 'top center';
+                wrapper.style.height = (cardH * scale) + 'px';
+            }
+        }
+
         function generateCardBacks() {
             // Collect all spell cards (may be inside wrappers from previous run)
             const allCards = Array.from(cardsContainer.querySelectorAll('.spell-card'));
@@ -1517,6 +1570,8 @@
                 });
                 cardsContainer.appendChild(backPage);
             });
+
+            updateBackPreview();
         }
 
         // Card backs event listeners
@@ -1525,6 +1580,7 @@
             if (cardsContainer.querySelectorAll('.spell-card').length > 0) {
                 generateCardBacks();
             }
+            updateBackPreview();
         });
         backOrnament.addEventListener('change', () => {
             const isCustom = backOrnament.value === 'custom';
@@ -1532,21 +1588,30 @@
             backCustomFontOptions.style.display = isCustom ? 'block' : 'none';
         });
         backCustomOrnament.addEventListener('input', () => {
-            if (cardBacksCheckbox.checked && cardsContainer.querySelectorAll('.spell-card').length > 0) {
-                generateCardBacks();
+            if (cardBacksCheckbox.checked) {
+                if (cardsContainer.querySelectorAll('.spell-card').length > 0) {
+                    generateCardBacks();
+                }
+                updateBackPreview();
             }
         });
         [backFont, backBold, backItalic, backOrnamentSize].forEach(el => {
             el.addEventListener('change', () => {
-                if (cardBacksCheckbox.checked && cardsContainer.querySelectorAll('.spell-card').length > 0) {
-                    generateCardBacks();
+                if (cardBacksCheckbox.checked) {
+                    if (cardsContainer.querySelectorAll('.spell-card').length > 0) {
+                        generateCardBacks();
+                    }
+                    updateBackPreview();
                 }
             });
         });
         [backShowName, backShowInfo, backShowClass, backOrnament, backFlip].forEach(el => {
             el.addEventListener('change', () => {
-                if (cardBacksCheckbox.checked && cardsContainer.querySelectorAll('.spell-card').length > 0) {
-                    generateCardBacks();
+                if (cardBacksCheckbox.checked) {
+                    if (cardsContainer.querySelectorAll('.spell-card').length > 0) {
+                        generateCardBacks();
+                    }
+                    updateBackPreview();
                 }
             });
         });
