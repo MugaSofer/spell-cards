@@ -361,37 +361,62 @@ SRD_SPELLS = {
 
 
 def generate_srd51():
-    """Generate SRD 5.1 spell list from Wikidot data."""
+    """Generate SRD 5.1 spell list.
+
+    Prefers 5etools PHB data (has subclass info), falls back to Wikidot data.
+    """
     script_dir = Path(__file__).parent
-    input_file = script_dir / "spells.json"
     output_file = script_dir.parent / "srd_spells.json"
 
-    with open(input_file, "r", encoding="utf-8") as f:
-        all_spells = json.load(f)
+    # Prefer 5etools data (has subclass info + srd flag)
+    fivetools_file = script_dir / "spells_5etools_phb.json"
+    wikidot_file = script_dir / "spells.json"
 
-    srd_spells = []
-    matched = set()
-
-    for spell in all_spells:
-        name = spell["name"]
-        if name in SRD_SPELLS:
+    if fivetools_file.exists():
+        print(f"Reading from {fivetools_file.name} (5etools, has subclass data)")
+        with open(fivetools_file, "r", encoding="utf-8") as f:
+            all_spells = json.load(f)
+        # Filter by srd flag and apply name de-branding
+        srd_spells = []
+        for spell in all_spells:
+            if not spell.get("srd"):
+                continue
             new_spell = dict(spell)
-            srd_name = SRD_SPELLS[name]
+            srd_name = SRD_SPELLS.get(spell["name"])
             if srd_name is not None:
                 new_spell["name"] = srd_name
             new_spell["source"] = "SRD"
+            new_spell.pop("srd", None)
+            new_spell.pop("srd52", None)
             srd_spells.append(new_spell)
-            matched.add(name)
-
-    # Check which SRD entries weren't matched
-    srd_only_names = {v for v in SRD_SPELLS.values() if v is not None}
-    matchable_names = set(SRD_SPELLS.keys()) - srd_only_names
-    unmatched = matchable_names - matched
-
-    if unmatched:
-        print(f"\nWARNING: {len(unmatched)} SRD spells not found in spells.json:")
-        for name in sorted(unmatched):
-            print(f"  - {name}")
+    elif wikidot_file.exists():
+        print(f"Reading from {wikidot_file.name} (Wikidot)")
+        with open(wikidot_file, "r", encoding="utf-8") as f:
+            all_spells = json.load(f)
+        srd_spells = []
+        matched = set()
+        for spell in all_spells:
+            name = spell["name"]
+            if name in SRD_SPELLS:
+                new_spell = dict(spell)
+                srd_name = SRD_SPELLS[name]
+                if srd_name is not None:
+                    new_spell["name"] = srd_name
+                new_spell["source"] = "SRD"
+                srd_spells.append(new_spell)
+                matched.add(name)
+        srd_only_names = {v for v in SRD_SPELLS.values() if v is not None}
+        matchable_names = set(SRD_SPELLS.keys()) - srd_only_names
+        unmatched = matchable_names - matched
+        if unmatched:
+            print(f"\nWARNING: {len(unmatched)} SRD spells not found:")
+            for name in sorted(unmatched):
+                print(f"  - {name}")
+    else:
+        print(f"ERROR: No input file found.")
+        print(f"Run: python convert_5etools.py --sources PHB")
+        print(f"  or: python scrape_spells.py")
+        return []
 
     srd_spells.sort(key=lambda s: (s.get("level", 0), s.get("name", "")))
 

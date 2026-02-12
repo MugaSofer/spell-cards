@@ -909,6 +909,13 @@
                 </select>
             </div>
 
+            <div class="control-group">
+                <label for="subclassSelect">Filter by Subclass</label>
+                <select id="subclassSelect">
+                    <option value="">-- All Subclasses --</option>
+                </select>
+            </div>
+
             <div class="control-group levels-group">
                 <label>Spell Levels</label>
                 <div class="level-checkboxes" id="levelCheckboxes">
@@ -1248,6 +1255,7 @@
         const cardSizeSelect = document.getElementById('cardSize');
         const fontSizeSelect = document.getElementById('fontSize');
         const schoolSelect = document.getElementById('schoolSelect');
+        const subclassSelect = document.getElementById('subclassSelect');
         const sourceSelect = document.getElementById('sourceSelect');
         const colorModeSelect = document.getElementById('colorMode');
         const overflowModeSelect = document.getElementById('overflowMode');
@@ -1694,6 +1702,52 @@
                 sorted.map(s => `<option value="${s}">${s}</option>`).join('');
         }
 
+        // Populate subclass dropdown, optionally filtered by class
+        function populateSubclassDropdown() {
+            const classFilter = classSelect.value;
+            // Collect all subclass labels from spell data
+            const byClass = {};
+            allSpells.forEach(s => {
+                if (!s.subclasses) return;
+                s.subclasses.forEach(sc => {
+                    const colonIdx = sc.indexOf(':');
+                    if (colonIdx === -1) return;
+                    const cls = sc.substring(0, colonIdx).trim();
+                    if (classFilter && cls !== classFilter) return;
+                    if (!byClass[cls]) byClass[cls] = new Set();
+                    byClass[cls].add(sc);
+                });
+            });
+
+            let html = '<option value="">-- All Subclasses --</option>';
+            const classes = Object.keys(byClass).sort();
+            if (classes.length > 1) {
+                // Use optgroups when showing multiple classes
+                for (const cls of classes) {
+                    const subs = Array.from(byClass[cls]).sort();
+                    html += `<optgroup label="${cls}">`;
+                    for (const sc of subs) {
+                        const label = sc.substring(sc.indexOf(':') + 1).trim();
+                        html += `<option value="${sc}">${label}</option>`;
+                    }
+                    html += '</optgroup>';
+                }
+            } else if (classes.length === 1) {
+                // Single class: no optgroup needed
+                const subs = Array.from(byClass[classes[0]]).sort();
+                for (const sc of subs) {
+                    const label = sc.substring(sc.indexOf(':') + 1).trim();
+                    html += `<option value="${sc}">${label}</option>`;
+                }
+            }
+            subclassSelect.innerHTML = html;
+        }
+
+        classSelect.addEventListener('change', () => {
+            populateSubclassDropdown();
+            subclassSelect.value = '';
+        });
+
         // Load spells from file
         document.getElementById('loadFileBtn').addEventListener('click', () => {
             fileInput.click();
@@ -1708,6 +1762,7 @@
                 allSpells = JSON.parse(text);
                 document.getElementById('srdBanner').style.display = 'none';
                 populateSourceDropdown();
+                populateSubclassDropdown();
                 showStatus(`Loaded ${allSpells.length} spells successfully!`, 'success');
             } catch (err) {
                 showStatus(`Error loading file: ${err.message}`, 'error');
@@ -1728,6 +1783,7 @@
                     document.getElementById('srdBanner').style.display = 'block';
                     document.getElementById('srdCount').textContent = allSpells.length;
                     populateSourceDropdown();
+                populateSubclassDropdown();
                     loadCustomSpells();
                     loadSpellsFromURL();
                     return;
@@ -1737,6 +1793,7 @@
                 if (resp.ok) {
                     allSpells = await resp.json();
                     populateSourceDropdown();
+                populateSubclassDropdown();
                     loadCustomSpells();
                     loadSpellsFromURL();
                     showStatus(`Loaded ${allSpells.length} spells from spells.json`, 'success');
@@ -1755,16 +1812,17 @@
             return Array.from(checkboxes).map(cb => parseInt(cb.value));
         }
 
-        // Add filtered spells (by class, level, school, source)
+        // Add filtered spells (by class, subclass, level, school, source)
         document.getElementById('addClassSpells').addEventListener('click', () => {
             const selectedClass = classSelect.value;
+            const selectedSubclass = subclassSelect.value;
             const selectedSchool = schoolSelect.value;
             const selectedSource = sourceSelect.value;
             const levels = getSelectedLevels();
 
             // At least one filter should be active
-            if (!selectedClass && !selectedSchool && !selectedSource) {
-                showStatus('Please select at least a class, school, or source to filter by', 'error');
+            if (!selectedClass && !selectedSubclass && !selectedSchool && !selectedSource) {
+                showStatus('Please select at least a class, subclass, school, or source to filter by', 'error');
                 return;
             }
 
@@ -1772,6 +1830,7 @@
             allSpells.forEach(spell => {
                 if (!levels.includes(spell.level)) return;
                 if (selectedClass && !(spell.classes && spell.classes.includes(selectedClass))) return;
+                if (selectedSubclass && !(spell.subclasses && spell.subclasses.includes(selectedSubclass))) return;
                 if (selectedSchool && spell.school !== selectedSchool) return;
                 if (selectedSource && (spell.source || 'PHB') !== selectedSource) return;
 
@@ -1781,7 +1840,7 @@
                 }
             });
 
-            const filterDesc = [selectedClass, selectedSchool, selectedSource].filter(Boolean).join(' / ');
+            const filterDesc = [selectedClass, selectedSubclass, selectedSchool, selectedSource].filter(Boolean).join(' / ');
             updateSelectedSpellsList();
             showStatus(`Added ${added} spells (${filterDesc})`, 'success');
         });
@@ -2092,6 +2151,7 @@
 
                 updateSelectedSpellsList();
                 populateSourceDropdown();
+                populateSubclassDropdown();
                 let msg = `Imported ${added} spells from ${file.name}`;
                 if (skipped > 0) msg += ` (${skipped} not found)`;
                 showStatus(msg, added > 0 ? 'success' : 'error');
