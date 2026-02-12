@@ -892,7 +892,7 @@
 
         <div id="srdBanner" class="status info" style="display:none;">
             <span id="srdBannerText">
-                Showing <strong id="srdCount">319</strong> spells in the 2014 5e SRD.
+                Showing spells from the 5e SRD.
                 Want more? Use the <a href="https://github.com/MugaSofer/spell-cards/tree/main/scraper" target="_blank">scraper tool</a>
                 to generate your own data, then load it below; or
                 <a href="#" id="load5etools">load all available spells from 5etools</a>.
@@ -958,6 +958,15 @@
                     <option value="Necromancy">Necromancy</option>
                     <option value="Transmutation">Transmutation</option>
                 </select>
+            </div>
+
+            <div class="control-group">
+                <label>Edition</label>
+                <div style="display:flex; gap:10px;">
+                    <label><input type="radio" name="edition" value="2014" checked> 2014</label>
+                    <label><input type="radio" name="edition" value="2024"> 2024</label>
+                    <label><input type="radio" name="edition" value=""> Both</label>
+                </div>
             </div>
 
             <div class="control-group">
@@ -1721,27 +1730,48 @@
             'AI': "Acquisitions Incorporated",
             'BMT': "The Book of Many Things",
             'LLK': "Lost Laboratory of Kwalish",
-            'EFA': "Elemental Fury of the Air",
-            'SatO': "Seas and the Ocean",
+            'EFA': "Eberron: Forge of the Artificer",
+            'SatO': "Sigil and the Outlands",
             'FRHoF': "Forgotten Realms: Heroes of Faerûn",
             'AitFR-AVT': "Adventures in the FR: A Verdant Tomb",
-            'SRD': 'SRD',
+            'SRD': 'SRD (2014)',
+            'SRD 2024': 'SRD (2024)',
         };
 
+        const EDITION_2024_SOURCES = new Set(['XPHB', 'SRD 2024', 'EFA', 'FRHoF']);
+
+        function getSpellEdition(source) {
+            return EDITION_2024_SOURCES.has(source) ? '2024' : '2014';
+        }
+
+        function getSelectedEdition() {
+            const checked = document.querySelector('input[name="edition"]:checked');
+            return checked ? checked.value : '';
+        }
+
+        function spellMatchesEdition(spell, edition) {
+            return !edition || getSpellEdition(spell.source) === edition;
+        }
+
         function populateSourceDropdown() {
+            const edition = getSelectedEdition();
             const sources = new Set();
-            allSpells.forEach(s => sources.add(s.source || 'PHB'));
+            allSpells.forEach(s => {
+                if (spellMatchesEdition(s, edition)) sources.add(s.source || 'PHB');
+            });
             const sorted = Array.from(sources).sort();
             sourceSelect.innerHTML = '<option value="">-- All Sources --</option>' +
                 sorted.map(s => `<option value="${s}">${SOURCE_LABELS[s] || s}</option>`).join('');
         }
 
-        // Populate subclass dropdown, optionally filtered by class
+        // Populate subclass dropdown, optionally filtered by class and edition
         function populateSubclassDropdown() {
             const classFilter = classSelect.value;
+            const edition = getSelectedEdition();
             // Collect all subclass labels from spell data
             const byClass = {};
             allSpells.forEach(s => {
+                if (!spellMatchesEdition(s, edition)) return;
                 if (!s.subclasses) return;
                 s.subclasses.forEach(sc => {
                     const colonIdx = sc.indexOf(':');
@@ -1780,6 +1810,15 @@
         classSelect.addEventListener('change', () => {
             populateSubclassDropdown();
             subclassSelect.value = '';
+        });
+
+        document.querySelectorAll('input[name="edition"]').forEach(radio => {
+            radio.addEventListener('change', () => {
+                populateSourceDropdown();
+                populateSubclassDropdown();
+                sourceSelect.value = '';
+                subclassSelect.value = '';
+            });
         });
 
         // Load spells from file
@@ -2158,12 +2197,12 @@
                 `<a href="#" id="revert5etools">Revert to SRD spells</a>`;
         }
 
-        function showSrdBanner(count) {
+        function showSrdBanner() {
             const banner = document.getElementById('srdBanner');
             const bannerText = document.getElementById('srdBannerText');
             banner.style.display = 'block';
             bannerText.innerHTML =
-                `Showing <strong id="srdCount">${count}</strong> spells in the 2014 5e SRD. ` +
+                `Showing spells from the 5e SRD. ` +
                 `Want more? Use the <a href="https://github.com/MugaSofer/spell-cards/tree/main/scraper" target="_blank">scraper tool</a> ` +
                 `to generate your own data, then load it below; or ` +
                 `<a href="#" id="load5etools">load all available spells from 5etools</a>.`;
@@ -2265,7 +2304,16 @@
                 let resp = await fetch('srd_spells.json');
                 if (resp.ok) {
                     allSpells = await resp.json();
-                    showSrdBanner(allSpells.length);
+                    // Also load 2024 SRD if available
+                    try {
+                        const resp2024 = await fetch('srd_spells_2024.json');
+                        if (resp2024.ok) {
+                            const spells2024 = await resp2024.json();
+                            spells2024.forEach(s => s.source = 'SRD 2024');
+                            allSpells = allSpells.concat(spells2024);
+                        }
+                    } catch (e) { /* 2024 SRD not available, continue with 2014 only */ }
+                    showSrdBanner();
                     populateSourceDropdown();
                     populateSubclassDropdown();
                     loadCustomSpells();
@@ -2310,8 +2358,10 @@
                 return;
             }
 
+            const edition = getSelectedEdition();
             let added = 0;
             allSpells.forEach(spell => {
+                if (!spellMatchesEdition(spell, edition)) return;
                 if (!levels.includes(spell.level)) return;
                 if (selectedClass && !(spell.classes && spell.classes.includes(selectedClass))) return;
                 if (selectedSubclass && !(spell.subclasses && spell.subclasses.includes(selectedSubclass))) return;
@@ -2339,8 +2389,9 @@
                 return;
             }
 
+            const edition = getSelectedEdition();
             const matches = allSpells
-                .filter(s => s.name.toLowerCase().includes(query))
+                .filter(s => spellMatchesEdition(s, edition) && s.name.toLowerCase().includes(query))
                 .slice(0, 10);
 
             if (matches.length === 0) {
