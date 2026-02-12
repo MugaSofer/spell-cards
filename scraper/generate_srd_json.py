@@ -1,15 +1,18 @@
 #!/usr/bin/env python3
 """
-Filters spells.json down to SRD 5.1 spells only, with de-branded names.
-Outputs srd_spells.json for use with the public website.
+Filters spell data down to SRD spells only.
+Outputs srd_spells.json (5.1) or srd_spells_2024.json (5.2) for use with the public website.
 
 Usage:
-    python generate_srd_json.py
+    python generate_srd_json.py                  # SRD 5.1 from Wikidot data
+    python generate_srd_json.py --edition 2024   # SRD 5.2 from 5etools data
 
-Expects spells.json in the same directory (output of scrape_spells.py).
-Outputs srd_spells.json in the parent directory (project root).
+SRD 5.1: Expects spells.json (output of scrape_spells.py). Uses hardcoded spell list.
+SRD 5.2: Expects spells_5etools_xphb.json (output of convert_5etools.py --sources XPHB).
+          Uses the srd52 flag from 5etools data.
 """
 
+import argparse
 import json
 from pathlib import Path
 
@@ -356,7 +359,9 @@ SRD_SPELLS = {
     "Zone of Truth": None,
 }
 
-def main():
+
+def generate_srd51():
+    """Generate SRD 5.1 spell list from Wikidot data."""
     script_dir = Path(__file__).parent
     input_file = script_dir / "spells.json"
     output_file = script_dir.parent / "srd_spells.json"
@@ -366,7 +371,6 @@ def main():
 
     srd_spells = []
     matched = set()
-    unmatched_srd = set()
 
     for spell in all_spells:
         name = spell["name"]
@@ -374,14 +378,12 @@ def main():
             new_spell = dict(spell)
             srd_name = SRD_SPELLS[name]
             if srd_name is not None:
-                # Rename to SRD name
                 new_spell["name"] = srd_name
             new_spell["source"] = "SRD"
             srd_spells.append(new_spell)
             matched.add(name)
 
-    # Check which SRD entries weren't matched (ignoring the SRD-name-only aliases)
-    phb_names_in_dict = {k for k, v in SRD_SPELLS.items() if v is not None}
+    # Check which SRD entries weren't matched
     srd_only_names = {v for v in SRD_SPELLS.values() if v is not None}
     matchable_names = set(SRD_SPELLS.keys()) - srd_only_names
     unmatched = matchable_names - matched
@@ -391,15 +393,50 @@ def main():
         for name in sorted(unmatched):
             print(f"  - {name}")
 
-    # Sort by level, then name
     srd_spells.sort(key=lambda s: (s.get("level", 0), s.get("name", "")))
 
     with open(output_file, "w", encoding="utf-8") as f:
         json.dump(srd_spells, f, indent=2, ensure_ascii=False)
 
-    print(f"Generated {output_file.name}: {len(srd_spells)} SRD spells")
+    print(f"Generated {output_file.name}: {len(srd_spells)} SRD 5.1 spells")
+    return srd_spells
 
-    # Summary by level
+
+def generate_srd52():
+    """Generate SRD 5.2 spell list from 5etools XPHB data."""
+    script_dir = Path(__file__).parent
+    input_file = script_dir / "spells_5etools_xphb.json"
+    output_file = script_dir.parent / "srd_spells_2024.json"
+
+    if not input_file.exists():
+        print(f"ERROR: {input_file} not found.")
+        print("Run first: python convert_5etools.py --sources XPHB")
+        return []
+
+    with open(input_file, "r", encoding="utf-8") as f:
+        all_spells = json.load(f)
+
+    srd_spells = []
+    for spell in all_spells:
+        if spell.get("srd52"):
+            new_spell = dict(spell)
+            new_spell["source"] = "SRD"
+            # Remove the srd/srd52 flags from the output
+            new_spell.pop("srd", None)
+            new_spell.pop("srd52", None)
+            srd_spells.append(new_spell)
+
+    srd_spells.sort(key=lambda s: (s.get("level", 0), s.get("name", "")))
+
+    with open(output_file, "w", encoding="utf-8") as f:
+        json.dump(srd_spells, f, indent=2, ensure_ascii=False)
+
+    print(f"Generated {output_file.name}: {len(srd_spells)} SRD 5.2 spells")
+    return srd_spells
+
+
+def print_summary(srd_spells):
+    """Print level breakdown."""
     by_level = {}
     for spell in srd_spells:
         level = spell.get("level", 0)
@@ -409,6 +446,21 @@ def main():
     for level in sorted(by_level.keys()):
         label = "Cantrips" if level == 0 else f"Level {level}"
         print(f"  {label}: {by_level[level]}")
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Generate SRD spell JSON for the website")
+    parser.add_argument("--edition", choices=["2014", "2024"], default="2014",
+                        help="Which SRD edition (default: 2014)")
+    args = parser.parse_args()
+
+    if args.edition == "2024":
+        spells = generate_srd52()
+    else:
+        spells = generate_srd51()
+
+    if spells:
+        print_summary(spells)
 
 
 if __name__ == "__main__":

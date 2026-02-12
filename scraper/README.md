@@ -60,9 +60,14 @@ Use the "Load custom spells.json" button in the web interface to load any output
 
 ## Regenerating SRD spells
 
-If you need to regenerate the SRD-only spell list (used by the public website):
+If you need to regenerate the SRD-only spell lists (used by the public website):
 
 ```bash
+# SRD 5.1 (319 spells, 2014 rules)
 python scrape_spells.py          # or --reparse if you have cached HTML
 python generate_srd_json.py      # outputs srd_spells.json to project root
+
+# SRD 5.2 (339 spells, 2024 rules)
+python convert_5etools.py --sources XPHB
+python generate_srd_json.py --edition 2024   # outputs srd_spells_2024.json to project root
 ```

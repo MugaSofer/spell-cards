@@ -301,7 +301,7 @@ def convert_spell(raw: dict, class_map: dict) -> dict:
             classes.append(cls_name)
             seen.add(cls_name)
 
-    return {
+    result = {
         "name": name,
         "source": source,
         "level": raw.get("level", 0),
@@ -316,6 +316,14 @@ def convert_spell(raw: dict, class_map: dict) -> dict:
         "at_higher_levels": at_higher_levels,
         "classes": classes,
     }
+
+    # SRD flags (used by generate_srd_json.py)
+    if raw.get("srd"):
+        result["srd"] = True
+    if raw.get("srd52"):
+        result["srd52"] = True
+
+    return result
 
 
 def main():
