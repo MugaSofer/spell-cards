@@ -41,6 +41,19 @@ python scrape_open5e.py --list-sources     # Show available sources
 
 Output: `spells_open5e.json` (or `spells_open5e_<source>.json` when filtered)
 
+### 5etools (convert_5etools.py)
+
+Converts spell data from the [5etools](https://5e.tools) GitHub repository. The most complete D&D 5e spell database, covering every official WotC sourcebook including the 2024 PHB (XPHB). 936 spells from 17 sources.
+
+```bash
+python convert_5etools.py                        # All sources (936 spells)
+python convert_5etools.py --sources PHB XGE TCE  # Specific books
+python convert_5etools.py --sources XPHB         # 2024 PHB only
+python convert_5etools.py --list-sources         # Show available sources
+```
+
+Output: `spells_5etools.json` (or `spells_5etools_<source>.json` when filtered to one source)
+
 ## Using with the Spell Card Generator
 
 Use the "Load custom spells.json" button in the web interface to load any output file directly.

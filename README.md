@@ -21,7 +21,7 @@ A free web tool for generating printable spell cards for D&D 5th Edition.
 
 ## Custom Spell Data
 
-The site ships with spells from the [SRD 5.1](https://media.wizards.com/2016/downloads/DND/SRD-OGL_V5.1.pdf) (freely licensed under CC-BY-4.0). For the full 500+ spell list, you can generate your own data using the [scraper tool](scraper/).
+The site ships with spells from the [SRD 5.1](https://media.wizards.com/2016/downloads/DND/SRD-OGL_V5.1.pdf) (freely licensed under CC-BY-4.0). For the full 900+ spell list from every WotC sourcebook, you can generate your own data using the [scraper tools](scraper/).
 
 ## Planned Features
 
