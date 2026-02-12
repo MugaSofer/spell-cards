@@ -28,6 +28,7 @@ from pathlib import Path
 import requests
 
 REPO_BASE = "https://raw.githubusercontent.com/5etools-mirror-3/5etools-src/main/data/spells"
+CLASS_BASE = "https://raw.githubusercontent.com/5etools-mirror-3/5etools-src/main/data/class"
 OUTPUT_FILE = Path(__file__).parent / "spells_5etools.json"
 
 HEADERS = {"User-Agent": "Mozilla/5.0"}
@@ -255,7 +256,82 @@ def convert_entries(entries: list) -> str:
     return "\n".join(parts)
 
 
-def convert_spell(raw: dict, class_map: dict) -> dict:
+def normalize_spell_ref(ref: str) -> str:
+    """Normalize a 5etools spell reference to a plain spell name.
+
+    'mind sliver|tce#c' -> 'mind sliver'
+    'charm person|xphb' -> 'charm person'
+    'faerie fire' -> 'faerie fire'
+    """
+    ref = ref.split("#")[0]   # Remove cantrip marker
+    ref = ref.split("|")[0]   # Remove source suffix
+    return ref.strip()
+
+
+def extract_spell_refs(obj) -> list[str]:
+    """Recursively extract spell name strings from a nested additionalSpells structure.
+
+    Skips filter objects like {"all": "level=0|class=Wizard"}.
+    """
+    names = []
+    if isinstance(obj, str):
+        names.append(normalize_spell_ref(obj))
+    elif isinstance(obj, list):
+        for item in obj:
+            if isinstance(item, str):
+                names.append(normalize_spell_ref(item))
+            # Skip dict items (filter objects like {"all": ...}, {"choose": ...})
+    elif isinstance(obj, dict):
+        for value in obj.values():
+            names.extend(extract_spell_refs(value))
+    return names
+
+
+def build_subclass_map() -> dict[str, set[str]]:
+    """Fetch class files and build spell name -> set of subclass labels mapping."""
+    print("Fetching subclass spell data...")
+    index = fetch_json(f"{CLASS_BASE}/index.json")
+
+    spell_subclasses: dict[str, set[str]] = {}
+
+    for class_key, filename in sorted(index.items()):
+        data = fetch_json(f"{CLASS_BASE}/{filename}")
+        subclasses = data.get("subclass", [])
+
+        sc_with_spells = 0
+        for sc in subclasses:
+            additional = sc.get("additionalSpells")
+            if not additional:
+                continue
+
+            sc_with_spells += 1
+            class_name = sc.get("className", "")
+            short_name = sc.get("shortName", sc.get("name", ""))
+
+            for entry in additional:
+                variant = entry.get("name")
+                if variant:
+                    label = f"{class_name}: {short_name} ({variant})"
+                else:
+                    label = f"{class_name}: {short_name}"
+
+                # Collect spells from all acquisition modes
+                for mode in ("prepared", "expanded", "known", "innate"):
+                    mode_data = entry.get(mode)
+                    if mode_data:
+                        for ref in extract_spell_refs(mode_data):
+                            spell_subclasses.setdefault(ref.lower(), set()).add(label)
+
+        if sc_with_spells:
+            print(f"  {class_key}: {sc_with_spells} subclasses with spell lists")
+
+    total_spells = len(spell_subclasses)
+    total_assoc = sum(len(v) for v in spell_subclasses.values())
+    print(f"  {total_spells} spells mapped to subclasses ({total_assoc} total associations)")
+    return spell_subclasses
+
+
+def convert_spell(raw: dict, class_map: dict, subclass_map: dict[str, set[str]] | None = None) -> dict:
     """Convert a 5etools spell to our format."""
     name = raw["name"]
     source = raw.get("source", "")
@@ -317,6 +393,12 @@ def convert_spell(raw: dict, class_map: dict) -> dict:
         "classes": classes,
     }
 
+    # Subclasses
+    if subclass_map:
+        sc_labels = subclass_map.get(name.lower(), set())
+        if sc_labels:
+            result["subclasses"] = sorted(sc_labels)
+
     # SRD flags (used by generate_srd_json.py)
     if raw.get("srd"):
         result["srd"] = True
@@ -356,6 +438,9 @@ def main():
     print("Fetching class mapping...")
     class_map = fetch_json(f"{REPO_BASE}/sources.json")
 
+    # Fetch subclass spell data
+    subclass_map = build_subclass_map()
+
     # Fetch and convert spells
     all_spells = []
     for code in source_codes:
@@ -369,7 +454,7 @@ def main():
         raw_spells = data.get("spell", [])
 
         for raw in raw_spells:
-            spell = convert_spell(raw, class_map)
+            spell = convert_spell(raw, class_map, subclass_map)
             all_spells.append(spell)
 
         print(f"    {len(raw_spells)} spells")

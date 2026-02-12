@@ -55,6 +55,12 @@ SOURCE_MAP_2024 = {
     "free rules": "Free24",
 }
 
+# Classes that have subclass spell lists
+SUBCLASS_CLASSES = {
+    "2014": ["cleric", "druid", "paladin", "ranger", "sorcerer", "warlock"],
+    "2024": ["cleric", "druid", "paladin", "ranger", "sorcerer", "warlock"],
+}
+
 SITE_CONFIGS = {
     "2014": {
         "base_url": "http://dnd5e.wikidot.com",
@@ -377,6 +383,161 @@ def parse_spell_html(html: str, name: str) -> dict | None:
         return None
 
 
+def get_subclass_urls(class_name: str) -> list[dict]:
+    """Get subclass page URLs from a class index page."""
+    url = f"{BASE_URL}/{class_name}"
+    try:
+        soup = get_soup(url)
+    except Exception as e:
+        print(f"    Could not fetch {class_name} index: {e}")
+        return []
+
+    content = soup.find("div", {"id": "page-content"})
+    if not content:
+        return []
+
+    subclasses = []
+    seen = set()
+    for link in content.find_all("a"):
+        href = link.get("href", "")
+        # Subclass links: absolute (2014) or relative (2024)
+        # e.g. "http://dnd5e.wikidot.com/cleric:knowledge" or "/cleric:knowledge"
+        # Normalize to get the slug
+        slug = ""
+        if f"/{class_name}:" in href:
+            slug = href.split("/")[-1]
+        elif href.startswith(f"/{class_name}:"):
+            slug = href.lstrip("/")
+
+        if not slug or slug in seen:
+            continue
+        # Skip UA subclasses
+        if "-ua" in slug:
+            continue
+        seen.add(slug)
+
+        sc_name = link.get_text(strip=True)
+        sc_url = f"{BASE_URL}/{slug}" if not href.startswith("http") else href
+        subclasses.append({
+            "name": sc_name,
+            "slug": slug,
+            "url": sc_url,
+            "class": class_name.capitalize(),
+        })
+
+    return subclasses
+
+
+def parse_subclass_spells(html: str, class_name: str, sc_name: str) -> list[tuple[str, str]]:
+    """Parse spell names from a subclass page's spell table.
+
+    Returns list of (spell_name, label) tuples where label is 'Class: Subclass'.
+    Handles both single-column tables (with variant section headers like Druid Land)
+    and multi-column tables (like Warlock Genie with Dao/Djinni/Efreeti/Marid columns).
+    """
+    soup = BeautifulSoup(html, "html.parser")
+    content = soup.find("div", {"id": "page-content"})
+    if not content:
+        return []
+
+    results = []
+    current_variant = None
+
+    for table in content.find_all("table", class_="wiki-content-table"):
+        rows = table.find_all("tr")
+        column_variants = None  # For multi-column spell tables
+
+        for row in rows:
+            ths = row.find_all("th")
+            tds = row.find_all("td")
+
+            # Check for variant section header (e.g. "Arctic", "Coast" for Druid Land)
+            if len(ths) == 1 and ths[0].get("colspan"):
+                header_text = ths[0].get_text(strip=True)
+                if "spell" not in header_text.lower() and "level" not in header_text.lower():
+                    current_variant = header_text
+
+            # Column header row — detect multi-column spell tables
+            if len(ths) >= 2:
+                header_texts = [th.get_text(strip=True) for th in ths]
+                spell_cols = [i for i, h in enumerate(header_texts) if "spell" in h.lower()]
+                if spell_cols:
+                    if len(spell_cols) > 1:
+                        # Multi-column: each column is a variant (e.g. "Genie Spells", "Dao Spells")
+                        column_variants = {}
+                        for i in spell_cols:
+                            col_name = header_texts[i].replace(" Spells", "").replace(" spells", "").strip()
+                            column_variants[i] = col_name
+                    continue
+
+            # Data row with spell links
+            if not tds:
+                continue
+
+            if column_variants:
+                # Multi-column table: extract spells from each variant column
+                for col_idx, variant_name in column_variants.items():
+                    if col_idx < len(tds):
+                        cell = tds[col_idx]
+                        for link in cell.find_all("a"):
+                            if "spell:" in link.get("href", ""):
+                                spell_name = link.get_text(strip=True)
+                                label = f"{class_name}: {sc_name} ({variant_name})"
+                                results.append((spell_name, label))
+            elif len(tds) >= 2:
+                # Single-column table: spells in the last column
+                spell_cell = tds[-1]
+                for link in spell_cell.find_all("a"):
+                    if "spell:" in link.get("href", ""):
+                        spell_name = link.get_text(strip=True)
+                        if current_variant:
+                            label = f"{class_name}: {sc_name} ({current_variant})"
+                        else:
+                            label = f"{class_name}: {sc_name}"
+                        results.append((spell_name, label))
+
+    return results
+
+
+def build_wikidot_subclass_map() -> dict[str, set[str]]:
+    """Scrape subclass pages and build spell name -> subclass labels mapping."""
+    print("Fetching subclass spell data...")
+
+    classes = SUBCLASS_CLASSES.get(SITE, [])
+    spell_subclasses: dict[str, set[str]] = {}
+
+    for class_name in classes:
+        print(f"  {class_name}...")
+        sc_urls = get_subclass_urls(class_name)
+        print(f"    {len(sc_urls)} subclasses found")
+
+        for sc in sc_urls:
+            try:
+                resp = requests.get(sc["url"], headers=HEADERS, timeout=30)
+                resp.raise_for_status()
+                html = resp.text
+                time.sleep(0.1)
+            except Exception as e:
+                print(f"    Error fetching {sc['name']}: {e}")
+                continue
+
+            pairs = parse_subclass_spells(html, sc["class"], sc["name"])
+            for spell_name, label in pairs:
+                spell_subclasses.setdefault(spell_name.lower(), set()).add(label)
+
+            if pairs:
+                # Count unique spells for this subclass
+                unique = len(set(name for name, _ in pairs))
+                labels = set(label for _, label in pairs)
+                for label in labels:
+                    count = sum(1 for _, l in pairs if l == label)
+
+    total_spells = len(spell_subclasses)
+    total_assoc = sum(len(v) for v in spell_subclasses.values())
+    print(f"  {total_spells} spells mapped to subclasses ({total_assoc} total associations)")
+    return spell_subclasses
+
+
 def scrape_all_spells(reparse_only: bool = False) -> list[dict]:
     """Scrape all spells from the wiki."""
     spell_links = get_all_spell_links()
@@ -431,6 +592,14 @@ def main():
         print("Reparsing from saved HTML files...")
 
     spells = scrape_all_spells(reparse_only=args.reparse)
+
+    # Fetch subclass data (unless --reparse, to avoid network calls)
+    if not args.reparse:
+        subclass_map = build_wikidot_subclass_map()
+        for spell in spells:
+            sc_labels = subclass_map.get(spell["name"].lower(), set())
+            if sc_labels:
+                spell["subclasses"] = sorted(sc_labels)
 
     # Sort by level, then name
     spells.sort(key=lambda s: (s.get("level", 0), s.get("name", "")))
