@@ -1117,7 +1117,6 @@
 
         <div class="button-row">
             <button id="addClassSpells">Add Filtered Spells</button>
-            <button id="generateCards">Generate Cards</button>
             <button id="printCards">Print Cards</button>
             <button id="clearSelection" class="danger">Clear All</button>
         </div>
@@ -2523,6 +2522,8 @@
                     <button onclick="removeSpell('${spell.name.replace(/'/g, "\\'")}')">&times;</button>
                 </span>
             `).join('');
+
+            generateCards();
         }
 
         // Clear all
@@ -2733,9 +2734,6 @@
                 showStatus(`Error reading file: ${err.message}`, 'error');
             }
         });
-
-        // Generate cards
-        document.getElementById('generateCards').addEventListener('click', generateCards);
 
         function generateCards() {
             if (selectedSpells.size === 0) {
