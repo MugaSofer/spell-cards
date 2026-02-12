@@ -920,6 +920,7 @@
                     <option value="Warlock">Warlock</option>
                     <option value="Wizard">Wizard</option>
                 </select>
+                <div id="classWarning" style="display:none; margin-top:4px; font-size:12px; color:#856404; background:#fff3cd; padding:4px 8px; border-radius:3px;"></div>
             </div>
 
             <div class="control-group">
@@ -1830,9 +1831,24 @@
             subclassSelect.innerHTML = html;
         }
 
+        const SRD_LIMITED_CLASSES = new Set(['Warlock', 'Paladin']);
+
+        function updateClassWarning() {
+            const warning = document.getElementById('classWarning');
+            const cls = classSelect.value;
+            const isSrdOnly = allSpells.length > 0 && allSpells.every(s => s.source === 'SRD' || s.source === 'SRD 2024' || s.source === 'Custom');
+            if (isSrdOnly && SRD_LIMITED_CLASSES.has(cls)) {
+                warning.textContent = `Warning: The SRD is missing key ${cls} spells. Loading from 5etools is recommended.`;
+                warning.style.display = 'block';
+            } else {
+                warning.style.display = 'none';
+            }
+        }
+
         classSelect.addEventListener('change', () => {
             populateSubclassDropdown();
             subclassSelect.value = '';
+            updateClassWarning();
         });
 
         document.querySelectorAll('input[name="edition"]').forEach(radio => {
