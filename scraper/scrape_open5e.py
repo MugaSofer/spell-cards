@@ -120,7 +120,22 @@ def convert_spell(raw: dict) -> dict:
 
     higher = raw.get("higher_level", "")
 
-    return {
+    # Subclass spell lists (e.g. "Cleric: Knowledge", "Warlock: Fiend")
+    subclasses = []
+    archetype = raw.get("archetype", "")
+    if archetype:
+        for part in archetype.split(","):
+            part = part.strip()
+            # Fix entries missing the class prefix (e.g. "Grassland" -> "Druid: Grassland")
+            if ":" not in part:
+                circles = raw.get("circles", "")
+                if circles and part.lower() in circles.lower():
+                    part = f"Druid: {part}"
+                else:
+                    continue
+            subclasses.append(part)
+
+    result = {
         "name": raw["name"],
         "source": source,
         "level": raw.get("level_int", raw.get("spell_level", 0)),
@@ -135,6 +150,11 @@ def convert_spell(raw: dict) -> dict:
         "at_higher_levels": higher,
         "classes": classes,
     }
+
+    if subclasses:
+        result["subclasses"] = subclasses
+
+    return result
 
 
 def main():
