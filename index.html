@@ -965,7 +965,7 @@
                 <div style="display:flex; gap:10px;">
                     <label><input type="radio" name="edition" value="2014" checked> 2014</label>
                     <label><input type="radio" name="edition" value="2024"> 2024</label>
-                    <label><input type="radio" name="edition" value=""> Both</label>
+                    <label><input type="radio" name="edition" value=""> All</label>
                 </div>
             </div>
 
@@ -1738,10 +1738,16 @@
             'SRD 2024': 'SRD (2024)',
         };
 
+        const EDITION_2014_SOURCES = new Set([
+            'PHB', 'XGE', 'TCE', 'FTD', 'SCC', 'GGR', 'EGW', 'IDRotF',
+            'AAG', 'AI', 'BMT', 'LLK', 'AitFR-AVT', 'SatO', 'SRD',
+        ]);
         const EDITION_2024_SOURCES = new Set(['XPHB', 'SRD 2024', 'EFA', 'FRHoF']);
 
         function getSpellEdition(source) {
-            return EDITION_2024_SOURCES.has(source) ? '2024' : '2014';
+            if (EDITION_2014_SOURCES.has(source)) return '2014';
+            if (EDITION_2024_SOURCES.has(source)) return '2024';
+            return 'unknown';
         }
 
         function getSelectedEdition() {
