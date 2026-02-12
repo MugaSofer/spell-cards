@@ -872,6 +872,16 @@
         @keyframes spin {
             to { transform: rotate(360deg); }
         }
+        .progress-spinner {
+            display: inline-block;
+            width: 14px; height: 14px;
+            border: 2px solid #ddd;
+            border-top-color: #2980b9;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            vertical-align: middle;
+            margin-right: 6px;
+        }
     </style>
 </head>
 <body>
@@ -881,9 +891,12 @@
         <div id="status"></div>
 
         <div id="srdBanner" class="status info" style="display:none;">
-            Showing <strong id="srdCount">319</strong> SRD-licensed spells.
-            Want more? Use the <a href="https://github.com/MugaSofer/spell-cards/tree/main/scraper" target="_blank">scraper tool</a>
-            to generate your own data, then load it below.
+            <span id="srdBannerText">
+                Showing <strong id="srdCount">319</strong> spells in the 2014 5e SRD.
+                Want more? Use the <a href="https://github.com/MugaSofer/spell-cards/tree/main/scraper" target="_blank">scraper tool</a>
+                to generate your own data, then load it below; or
+                <a href="#" id="load5etools">load all available spells from 5etools</a>.
+            </span>
         </div>
 
         <div class="controls">
@@ -1694,12 +1707,33 @@
         }
 
         // Populate source dropdown from loaded spell data
+        const SOURCE_LABELS = {
+            'PHB': "Player's Handbook (2014)",
+            'XPHB': "Player's Handbook (2024)",
+            'XGE': "Xanathar's Guide to Everything",
+            'TCE': "Tasha's Cauldron of Everything",
+            'FTD': "Fizban's Treasury of Dragons",
+            'SCC': "Strixhaven: A Curriculum of Chaos",
+            'GGR': "Guildmaster's Guide to Ravnica",
+            'EGW': "Explorer's Guide to Wildemount",
+            'IDRotF': "Icewind Dale: Rime of the Frostmaiden",
+            'AAG': "Astral Adventurer's Guide",
+            'AI': "Acquisitions Incorporated",
+            'BMT': "The Book of Many Things",
+            'LLK': "Lost Laboratory of Kwalish",
+            'EFA': "Elemental Fury of the Air",
+            'SatO': "Seas and the Ocean",
+            'FRHoF': "Forgotten Realms: Heroes of Faerûn",
+            'AitFR-AVT': "Adventures in the FR: A Verdant Tomb",
+            'SRD': 'SRD',
+        };
+
         function populateSourceDropdown() {
             const sources = new Set();
             allSpells.forEach(s => sources.add(s.source || 'PHB'));
             const sorted = Array.from(sources).sort();
             sourceSelect.innerHTML = '<option value="">-- All Sources --</option>' +
-                sorted.map(s => `<option value="${s}">${s}</option>`).join('');
+                sorted.map(s => `<option value="${s}">${SOURCE_LABELS[s] || s}</option>`).join('');
         }
 
         // Populate subclass dropdown, optionally filtered by class
@@ -1769,21 +1803,471 @@
             }
         });
 
+        // ===== 5ETOOLS CLIENT-SIDE SPELL LOADER =====
+        const FT_BASE = 'https://raw.githubusercontent.com/5etools-mirror-3/5etools-src/main/data/spells';
+        const FT_CLASS_BASE = 'https://raw.githubusercontent.com/5etools-mirror-3/5etools-src/main/data/class';
+        const FT_SCHOOL_MAP = {A:'Abjuration',C:'Conjuration',D:'Divination',E:'Enchantment',
+                               I:'Illusion',N:'Necromancy',T:'Transmutation',V:'Evocation'};
+        const FT_CLASSES = new Set(['Artificer','Bard','Cleric','Druid','Paladin','Ranger','Sorcerer','Warlock','Wizard']);
+        const FT_CACHE_KEY = 'fivetools_spells';
+        const FT_META_KEY = 'fivetools_meta';
+        const FT_CACHE_MAX_AGE = 30 * 24 * 60 * 60 * 1000; // 30 days
+
+        function ft_cleanTags(text) {
+            if (typeof text !== 'string') return String(text || '');
+            return text.replace(/\{@\w+ ([^}]+)\}/g, (_, content) => content.split('|')[0]);
+        }
+
+        function ft_convertTime(timeData) {
+            if (!timeData || !timeData.length) return '';
+            const parts = [];
+            for (const t of timeData) {
+                const num = t.number || 1;
+                const unit = t.unit || '';
+                const condition = t.condition || '';
+                let s;
+                if (unit === 'action') {
+                    s = num === 1 ? '1 action' : `${num} actions`;
+                } else if (unit === 'bonus') {
+                    s = '1 bonus action';
+                } else if (unit === 'reaction') {
+                    s = '1 reaction';
+                    if (condition) s += `, ${ft_cleanTags(condition)}`;
+                } else if (unit === 'minute') {
+                    s = num === 1 ? '1 minute' : `${num} minutes`;
+                } else if (unit === 'hour') {
+                    s = num === 1 ? '1 hour' : `${num} hours`;
+                } else {
+                    s = `${num} ${unit}`;
+                }
+                parts.push(s);
+            }
+            return parts.join(' or ');
+        }
+
+        function ft_convertRange(rangeData) {
+            if (!rangeData) return '';
+            const rtype = rangeData.type || '';
+            const dist = rangeData.distance || {};
+            const distType = dist.type || '';
+            const amount = dist.amount || 0;
+
+            if (rtype === 'special') return 'Special';
+            if (distType === 'self') return 'Self';
+            if (distType === 'touch') return 'Touch';
+            if (distType === 'sight') return 'Sight';
+            if (distType === 'unlimited') return 'Unlimited';
+
+            let base;
+            if (distType === 'feet') {
+                base = `${amount} feet`;
+            } else if (distType === 'miles') {
+                base = amount === 1 ? '1 mile' : `${amount} miles`;
+            } else {
+                base = `${amount} ${distType}`;
+            }
+
+            if (['line','cone','cube','sphere','hemisphere'].includes(rtype)) {
+                return `Self (${base} ${rtype})`;
+            }
+            return base;
+        }
+
+        function ft_convertComponents(compData) {
+            if (!compData) return '';
+            const parts = [];
+            if (compData.v) parts.push('V');
+            if (compData.s) parts.push('S');
+            const m = compData.m;
+            if (m) {
+                if (typeof m === 'string') {
+                    parts.push(`M (${m})`);
+                } else if (typeof m === 'object') {
+                    parts.push(`M (${m.text || ''})`);
+                }
+            }
+            return parts.join(', ');
+        }
+
+        function ft_convertDuration(durData) {
+            if (!durData || !durData.length) return ['', false];
+            const d = durData[0];
+            const dtype = d.type || '';
+            const concentration = d.concentration || false;
+            let text;
+
+            if (dtype === 'instant') {
+                text = 'Instantaneous';
+            } else if (dtype === 'permanent') {
+                const ends = d.ends || [];
+                if (ends.includes('dispel') && ends.includes('trigger')) {
+                    text = 'Until dispelled or triggered';
+                } else if (ends.includes('dispel')) {
+                    text = 'Until dispelled';
+                } else {
+                    text = 'Permanent';
+                }
+            } else if (dtype === 'special') {
+                text = 'Special';
+            } else if (dtype === 'timed') {
+                const dur = d.duration || {};
+                const amount = dur.amount || 0;
+                const unit = dur.type || '';
+                if (unit === 'round') {
+                    text = amount === 1 ? '1 round' : `${amount} rounds`;
+                } else if (unit === 'minute') {
+                    text = amount === 1 ? '1 minute' : `${amount} minutes`;
+                } else if (unit === 'hour') {
+                    text = amount === 1 ? '1 hour' : `${amount} hours`;
+                } else if (unit === 'day') {
+                    text = amount === 1 ? '1 day' : `${amount} days`;
+                } else {
+                    text = `${amount} ${unit}`;
+                }
+                if (concentration) {
+                    text = `Concentration, up to ${text}`;
+                }
+            } else {
+                text = dtype;
+            }
+            return [text, concentration];
+        }
+
+        function ft_convertEntries(entries) {
+            if (!entries || !entries.length) return '';
+            const parts = [];
+            for (const entry of entries) {
+                if (typeof entry === 'string') {
+                    parts.push(`<p>${ft_cleanTags(entry)}</p>`);
+                } else if (typeof entry === 'object' && entry !== null) {
+                    const etype = entry.type || '';
+                    if (etype === 'entries') {
+                        const inner = ft_convertEntries(entry.entries || []);
+                        const name = entry.name || '';
+                        if (name) {
+                            const stripped = inner.replace(/<p>/g, '').replace(/<\/p>/g, '');
+                            parts.push(`<p><b>${ft_cleanTags(name)}.</b> ${stripped}</p>`);
+                        } else {
+                            parts.push(inner);
+                        }
+                    } else if (etype === 'list') {
+                        const items = entry.items || [];
+                        const liParts = [];
+                        for (const item of items) {
+                            if (typeof item === 'string') {
+                                liParts.push(`<li>${ft_cleanTags(item)}</li>`);
+                            } else if (typeof item === 'object' && item !== null) {
+                                let text = item.entry || '';
+                                if (!text && Array.isArray(item.entries) && item.entries.length) {
+                                    text = item.entries[0];
+                                }
+                                if (typeof text === 'string') text = ft_cleanTags(text);
+                                const name = item.name || '';
+                                if (name) {
+                                    liParts.push(`<li><b>${ft_cleanTags(name)}.</b> ${text}</li>`);
+                                } else {
+                                    liParts.push(`<li>${text}</li>`);
+                                }
+                            }
+                        }
+                        parts.push(`<ul>${liParts.join('')}</ul>`);
+                    } else if (etype === 'table') {
+                        const rows = entry.rows || [];
+                        const caption = entry.caption || '';
+                        const headers = entry.colLabels || [];
+                        let html = '<table>';
+                        if (caption) html += `<caption>${ft_cleanTags(caption)}</caption>`;
+                        if (headers.length) {
+                            html += '<tr>' + headers.map(h => `<th>${ft_cleanTags(h)}</th>`).join('') + '</tr>';
+                        }
+                        for (const row of rows) {
+                            const cells = Array.isArray(row) ? row : [row];
+                            html += '<tr>' + cells.map(c => `<td>${ft_cleanTags(String(c))}</td>`).join('') + '</tr>';
+                        }
+                        html += '</table>';
+                        parts.push(html);
+                    } else if (etype === 'quote') {
+                        const text = (entry.entries || []).join(' ');
+                        parts.push(`<p><i>${ft_cleanTags(text)}</i></p>`);
+                    }
+                }
+            }
+            return parts.join('\n');
+        }
+
+        function ft_normalizeSpellRef(ref) {
+            return ref.split('#')[0].split('|')[0].trim();
+        }
+
+        function ft_extractSpellRefs(obj) {
+            const names = [];
+            if (typeof obj === 'string') {
+                names.push(ft_normalizeSpellRef(obj));
+            } else if (Array.isArray(obj)) {
+                for (const item of obj) {
+                    if (typeof item === 'string') {
+                        names.push(ft_normalizeSpellRef(item));
+                    }
+                    // Skip dict items in arrays (filter objects)
+                }
+            } else if (typeof obj === 'object' && obj !== null) {
+                for (const value of Object.values(obj)) {
+                    names.push(...ft_extractSpellRefs(value));
+                }
+            }
+            return names;
+        }
+
+        function ft_convertSpell(raw, classMap, subclassMap) {
+            const name = raw.name;
+            const source = raw.source || '';
+            const school = FT_SCHOOL_MAP[raw.school] || 'Unknown';
+            const castingTime = ft_convertTime(raw.time || []);
+            const rangeStr = ft_convertRange(raw.range || {});
+            const components = ft_convertComponents(raw.components || {});
+            const [duration, concentration] = ft_convertDuration(raw.duration || []);
+            const ritual = (raw.meta && raw.meta.ritual) || false;
+            const description = ft_convertEntries(raw.entries || []);
+
+            let atHigherLevels = '';
+            if (raw.entriesHigherLevel && raw.entriesHigherLevel.length) {
+                const ahl = raw.entriesHigherLevel[0];
+                atHigherLevels = ft_convertEntries(ahl.entries || []);
+                atHigherLevels = atHigherLevels.replace(/^<p>/, '').replace(/<\/p>$/, '').trim();
+            }
+
+            // Classes from the class map
+            const classes = [];
+            const spellData = (classMap[source] && classMap[source][name]) || {};
+            const spellClasses = (spellData.class || []).concat(spellData.classVariant || []);
+            const seen = new Set();
+            for (const cls of spellClasses) {
+                const clsName = cls.name || '';
+                if (FT_CLASSES.has(clsName) && !seen.has(clsName)) {
+                    classes.push(clsName);
+                    seen.add(clsName);
+                }
+            }
+
+            const result = {
+                name, source,
+                level: raw.level || 0,
+                school, ritual,
+                casting_time: castingTime,
+                range: rangeStr,
+                components, duration, concentration,
+                description,
+                at_higher_levels: atHigherLevels,
+                classes,
+            };
+
+            // Subclasses
+            const scLabels = subclassMap[name.toLowerCase()];
+            if (scLabels && scLabels.size > 0) {
+                result.subclasses = Array.from(scLabels).sort();
+            }
+
+            return result;
+        }
+
+        function ft_buildSubclassMap(classResults) {
+            const subclassMap = {}; // spellNameLower → Set<"Class: Subclass">
+            for (const result of classResults) {
+                if (result.status !== 'fulfilled') continue;
+                const data = result.value;
+                const subclasses = data.subclass || [];
+                for (const sc of subclasses) {
+                    const additional = sc.additionalSpells;
+                    if (!additional) continue;
+                    const className = sc.className || '';
+                    const shortName = sc.shortName || sc.name || '';
+                    for (const entry of additional) {
+                        const variant = entry.name;
+                        const label = variant
+                            ? `${className}: ${shortName} (${variant})`
+                            : `${className}: ${shortName}`;
+                        for (const mode of ['prepared', 'expanded', 'known', 'innate']) {
+                            if (entry[mode]) {
+                                for (const ref of ft_extractSpellRefs(entry[mode])) {
+                                    const key = ref.toLowerCase();
+                                    if (!subclassMap[key]) subclassMap[key] = new Set();
+                                    subclassMap[key].add(label);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            return subclassMap;
+        }
+
+        async function loadFrom5etools(progressFn) {
+            // Phase 1: Fetch indexes + sources.json
+            progressFn('Loading indexes...');
+            const [spellIndex, classIndex, sourcesData] = await Promise.all([
+                fetch(`${FT_BASE}/index.json`).then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); }),
+                fetch(`${FT_CLASS_BASE}/index.json`).then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); }),
+                fetch(`${FT_BASE}/sources.json`).then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); }),
+            ]);
+
+            // Phase 2: Fetch all spell source files
+            const spellFiles = Object.entries(spellIndex);
+            progressFn(`Loading ${spellFiles.length} spell sources...`);
+            const spellResults = await Promise.allSettled(
+                spellFiles.map(([code, file]) =>
+                    fetch(`${FT_BASE}/${file}`).then(r => {
+                        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+                        return r.json();
+                    }).then(data => ({ code, spells: data.spell || [] }))
+                )
+            );
+
+            // Phase 3: Fetch class files for subclass data
+            const classFiles = Object.entries(classIndex);
+            progressFn('Loading subclass data...');
+            const classResults = await Promise.allSettled(
+                classFiles.map(([key, file]) =>
+                    fetch(`${FT_CLASS_BASE}/${file}`).then(r => {
+                        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+                        return r.json();
+                    })
+                )
+            );
+
+            // Build subclass map
+            const subclassMap = ft_buildSubclassMap(classResults);
+
+            // Collect and convert all spells
+            progressFn('Converting spells...');
+            const rawSpells = spellResults
+                .filter(r => r.status === 'fulfilled')
+                .flatMap(r => r.value.spells);
+            const failedCount = spellResults.filter(r => r.status === 'rejected').length;
+
+            const converted = rawSpells.map(raw => ft_convertSpell(raw, sourcesData, subclassMap));
+            converted.sort((a, b) => a.level - b.level || a.name.localeCompare(b.name));
+
+            return { spells: converted, failedCount };
+        }
+
+        function show5etoolsBanner(count) {
+            const banner = document.getElementById('srdBanner');
+            const bannerText = document.getElementById('srdBannerText');
+            banner.style.display = 'block';
+            bannerText.innerHTML = `Showing <strong>${count}</strong> spells from 5etools. ` +
+                `<a href="#" id="revert5etools">Revert to SRD spells</a>`;
+        }
+
+        function showSrdBanner(count) {
+            const banner = document.getElementById('srdBanner');
+            const bannerText = document.getElementById('srdBannerText');
+            banner.style.display = 'block';
+            bannerText.innerHTML =
+                `Showing <strong id="srdCount">${count}</strong> spells in the 2014 5e SRD. ` +
+                `Want more? Use the <a href="https://github.com/MugaSofer/spell-cards/tree/main/scraper" target="_blank">scraper tool</a> ` +
+                `to generate your own data, then load it below; or ` +
+                `<a href="#" id="load5etools">load all available spells from 5etools</a>.`;
+        }
+
+        async function startLoad5etools() {
+            const bannerText = document.getElementById('srdBannerText');
+
+            function updateProgress(msg) {
+                bannerText.innerHTML = `<span class="progress-spinner"></span> ${msg}`;
+            }
+
+            try {
+                const { spells, failedCount } = await loadFrom5etools(updateProgress);
+
+                // Cache in localStorage
+                try {
+                    localStorage.setItem(FT_CACHE_KEY, JSON.stringify(spells));
+                    localStorage.setItem(FT_META_KEY, JSON.stringify({
+                        version: 1, timestamp: Date.now(), count: spells.length
+                    }));
+                } catch (storageErr) {
+                    console.warn('Could not cache 5etools data:', storageErr);
+                    showStatus('Spells loaded but could not be cached (storage full). They will need to be re-downloaded next visit.', 'info');
+                }
+
+                allSpells = spells;
+                loadCustomSpells();
+                populateSourceDropdown();
+                populateSubclassDropdown();
+                show5etoolsBanner(spells.length);
+
+                let msg = `Loaded ${spells.length} spells from 5etools!`;
+                if (failedCount > 0) msg += ` (${failedCount} sources skipped due to errors)`;
+                showStatus(msg, 'success');
+            } catch (err) {
+                bannerText.innerHTML = `Failed to load from 5etools: ${err.message}. ` +
+                    `<a href="#" id="load5etools">Try again</a> or use the ` +
+                    `<a href="https://github.com/MugaSofer/spell-cards/tree/main/scraper" target="_blank">scraper tool</a>.`;
+                showStatus('Failed to load spells from 5etools', 'error');
+            }
+        }
+
+        async function revertToSRD() {
+            localStorage.removeItem(FT_CACHE_KEY);
+            localStorage.removeItem(FT_META_KEY);
+            try {
+                const resp = await fetch('srd_spells.json');
+                if (resp.ok) {
+                    allSpells = await resp.json();
+                    loadCustomSpells();
+                    populateSourceDropdown();
+                    populateSubclassDropdown();
+                    showSrdBanner(allSpells.length);
+                    showStatus(`Reverted to ${allSpells.length} SRD spells`, 'success');
+                }
+            } catch (e) {
+                showStatus('Error reverting to SRD spells', 'error');
+            }
+        }
+
+        // Event delegation for 5etools banner links
+        document.getElementById('srdBanner').addEventListener('click', (e) => {
+            if (e.target.id === 'load5etools') {
+                e.preventDefault();
+                startLoad5etools();
+            } else if (e.target.id === 'revert5etools') {
+                e.preventDefault();
+                revertToSRD();
+            }
+        });
+
         // Try to load SRD spells on page load, fall back to full spells.json
         async function tryLoadDefaultSpells() {
             if (window.location.protocol === 'file:') {
                 showStatus('Click "Load custom spells.json" to load spell data.', 'info');
                 return;
             }
+
+            // Check for cached 5etools data first
+            try {
+                const meta = JSON.parse(localStorage.getItem(FT_META_KEY));
+                if (meta && meta.version === 1 && (Date.now() - meta.timestamp) < FT_CACHE_MAX_AGE) {
+                    const cached = localStorage.getItem(FT_CACHE_KEY);
+                    if (cached) {
+                        allSpells = JSON.parse(cached);
+                        populateSourceDropdown();
+                        populateSubclassDropdown();
+                        loadCustomSpells();
+                        loadSpellsFromURL();
+                        show5etoolsBanner(allSpells.length);
+                        return;
+                    }
+                }
+            } catch (e) { /* corrupt cache, fall through to SRD */ }
+
             try {
                 // Try SRD spells first (shipped with the site)
                 let resp = await fetch('srd_spells.json');
                 if (resp.ok) {
                     allSpells = await resp.json();
-                    document.getElementById('srdBanner').style.display = 'block';
-                    document.getElementById('srdCount').textContent = allSpells.length;
+                    showSrdBanner(allSpells.length);
                     populateSourceDropdown();
-                populateSubclassDropdown();
+                    populateSubclassDropdown();
                     loadCustomSpells();
                     loadSpellsFromURL();
                     return;
