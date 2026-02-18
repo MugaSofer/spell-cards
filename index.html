@@ -1464,9 +1464,15 @@
             const name = frontCard.querySelector('.card-name')?.textContent || '';
             const levelEl = frontCard.querySelector('.card-level');
             const schoolEl = frontCard.querySelector('.card-school');
-            const levelText = levelEl ? levelEl.textContent : '';
-            const schoolText = schoolEl ? schoolEl.textContent : '';
-            const info = schoolText || levelText;
+            const levelText = levelEl ? levelEl.textContent.trim() : '';
+            const schoolText = schoolEl ? schoolEl.textContent.trim() : '';
+            // schoolText is e.g. "Evocation" or "Evocation cantrip"
+            // levelText is e.g. "C", "1", "2", etc.
+            let info = schoolText;
+            if (levelText && levelText !== 'C' && schoolText && !schoolText.toLowerCase().includes('cantrip')) {
+                const ordinal = levelText === '1' ? '1st' : levelText === '2' ? '2nd' : levelText === '3' ? '3rd' : `${levelText}th`;
+                info = `${ordinal}-level ${schoolText}`;
+            }
 
             const classesEl = frontCard.querySelector('.card-classes');
             const classes = classesEl ? classesEl.textContent : '';
