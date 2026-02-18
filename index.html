@@ -800,9 +800,11 @@
                 grid-template-columns: repeat(3, var(--card-width));
             }
 
-            .spell-card {
+            .spell-card, .card-back {
                 margin: 0;
                 box-shadow: none;
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
             }
 
             /* Cut guides */
@@ -835,11 +837,6 @@
             .size-poker .front-page, .size-poker .back-page,
             .size-max6 .front-page, .size-max6 .back-page {
                 grid-template-columns: repeat(3, var(--card-width));
-            }
-
-            .card-back {
-                margin: 0;
-                box-shadow: none;
             }
 
             .card-back::before {
