@@ -25,6 +25,14 @@
             --font-footer: 7pt;
             --line-height: 1.3;
 
+            /* Element sizes (adjustable via Card Layout options) */
+            --level-size: 24px;
+            --font-badge: 7pt;
+
+            /* Badge colors */
+            --ritual-color: #9b59b6;
+            --conc-color: #e67e22;
+
             /* School colors */
             --school-abjuration: #3498db;
             --school-conjuration: #f39c12;
@@ -411,12 +419,12 @@
         }
 
         .card-level {
-            font-size: 14pt;
+            font-size: calc(var(--level-size) * 0.78);
             font-weight: bold;
             color: white;
             background: #333;
-            width: 24px;
-            height: 24px;
+            width: var(--level-size);
+            height: var(--level-size);
             border-radius: 50%;
             display: flex;
             align-items: center;
@@ -437,7 +445,7 @@
         }
 
         .badge {
-            font-size: 7pt;
+            font-size: var(--font-badge);
             padding: 1px 4px;
             border-radius: 3px;
             text-transform: uppercase;
@@ -445,13 +453,45 @@
         }
 
         .badge.ritual {
-            background: #9b59b6;
+            background: var(--ritual-color);
             color: white;
         }
 
         .badge.concentration {
-            background: #e67e22;
+            background: var(--conc-color);
             color: white;
+        }
+
+        /* Ritual/concentration tags on the same line as the school */
+        .layout-tags-inline .card-school-row,
+        .layout-tags-right .card-school-row {
+            display: flex;
+            align-items: baseline;
+            gap: 2px 6px;
+        }
+
+        .layout-tags-inline .card-school-row {
+            flex-wrap: wrap;
+        }
+
+        .layout-tags-right .card-school-row {
+            justify-content: space-between;
+        }
+
+        .layout-tags-inline .card-badges,
+        .layout-tags-right .card-badges {
+            margin-top: 0;
+            flex-shrink: 0;
+        }
+
+        /* Optional footer fields */
+        .layout-hide-classes .card-classes,
+        .layout-hide-source .card-source {
+            display: none;
+        }
+
+        .layout-hide-classes.layout-hide-source .card-footer {
+            display: none;
         }
 
         .card-stats {
@@ -618,10 +658,11 @@
         .color-class .spell-card[data-highlighted] .card-level { background: var(--active-color); }
 
         /* Color mode: Monochrome */
-        .color-mono .spell-card { border-color: #666; }
-        .color-mono .spell-card .card-level { background: #666; }
+        .color-mono .spell-card { border-color: var(--mono-color, #666); }
+        .color-mono .spell-card .card-level { background: var(--mono-color, #666); }
 
-        .color-greyscale .spell-card { filter: grayscale(100%); }
+        .color-greyscale .spell-card,
+        .color-greyscale .card-back { filter: grayscale(100%); }
 
         .color-bw .spell-card { border-color: #000; color: #000; }
         .color-bw .spell-card .card-level { background: #000; }
@@ -650,6 +691,97 @@
             padding-bottom: 2px;
             border-bottom: 1px dotted #ccc;
             margin-bottom: 2px;
+        }
+
+        /* ===== CARD LAYOUT PANEL ===== */
+        .layout-panel {
+            margin-top: 20px;
+            border-top: 1px solid #eee;
+            padding-top: 15px;
+        }
+
+        .layout-panel .toggle-btn {
+            width: 100%;
+            text-align: center;
+        }
+
+        .layout-form {
+            display: none;
+            margin-top: 15px;
+        }
+
+        .layout-form.active {
+            display: block;
+        }
+
+        .layout-form h4 {
+            margin: 0 0 8px;
+            font-size: 13px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: #888;
+        }
+
+        .layout-section {
+            margin-bottom: 18px;
+        }
+
+        .layout-sliders {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(230px, 300px));
+            gap: 6px 20px;
+        }
+
+        .layout-slider {
+            display: grid;
+            grid-template-columns: 110px 1fr 52px;
+            align-items: center;
+            gap: 8px;
+            font-size: 13px;
+        }
+
+        .layout-slider input[type="range"] {
+            width: 100%;
+            margin: 0;
+            cursor: pointer;
+        }
+
+        .layout-slider .layout-value {
+            font-size: 12px;
+            color: #666;
+            text-align: right;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .layout-checks {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px 20px;
+        }
+
+        .layout-checks label,
+        .layout-colors label {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 13px;
+            font-weight: normal;
+            cursor: pointer;
+        }
+
+        .layout-colors {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px 20px;
+        }
+
+        .layout-colors input[type="color"] {
+            width: 32px;
+            height: 24px;
+            border: 1px solid #ccc;
+            border-radius: 3px;
+            padding: 0;
+            cursor: pointer;
         }
 
         /* ===== CUSTOM SPELL FORM ===== */
@@ -1038,6 +1170,10 @@
                     <option value="bw">Black & White</option>
                 </select>
                 <a href="#" id="customizeClassColors" style="font-size:12px; color:#3498db; display:none;">Customize colors...</a>
+                <label id="monoColorWrap" style="display:none; align-items:center; gap:6px; font-size:12px; font-weight:normal; margin-top:4px; cursor:pointer;">
+                    <input type="color" id="monoColor" style="width:32px; height:24px; border:1px solid #ccc; border-radius:3px; padding:0; cursor:pointer;">
+                    Card color
+                </label>
                 <div id="colorClassInfo" style="display:none; font-size:12px; color:#666; line-height:1.4;">
                     <span id="colorClassMsg"></span>
                     <span id="colorClassOtherWrap" style="display:none;">
@@ -1155,6 +1291,89 @@
             <button id="exportFile" class="secondary">Export JSON</button>
             <input type="file" id="importFileInput" accept=".json,.txt" style="display:none;">
             <button id="importFile" class="secondary">Import JSON</button>
+        </div>
+
+        <div class="layout-panel">
+            <button class="toggle-btn" id="toggleLayout">Card Layout Options</button>
+            <div class="layout-form" id="layoutForm">
+                <div class="layout-section">
+                    <h4>Header</h4>
+                    <div class="layout-sliders">
+                        <label class="layout-slider">Spell name
+                            <input type="range" data-layout="fontName" min="6" max="20" step="0.5">
+                            <span class="layout-value"></span>
+                        </label>
+                        <label class="layout-slider">Level circle
+                            <input type="range" data-layout="levelSize" min="12" max="48" step="1">
+                            <span class="layout-value"></span>
+                        </label>
+                        <label class="layout-slider">School line
+                            <input type="range" data-layout="fontSchool" min="5" max="14" step="0.5">
+                            <span class="layout-value"></span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="layout-section">
+                    <h4>Ritual &amp; concentration tags</h4>
+                    <div class="layout-sliders">
+                        <label class="layout-slider">Position
+                            <select data-layout="tagPosition" style="grid-column:2 / span 2; font-size:13px; padding:2px 4px;">
+                                <option value="own">On their own line</option>
+                                <option value="inline">Beside the school</option>
+                                <option value="right">Right of the school line</option>
+                            </select>
+                        </label>
+                        <label class="layout-slider">Tag text
+                            <input type="range" data-layout="fontBadge" min="5" max="12" step="0.5">
+                            <span class="layout-value"></span>
+                        </label>
+                    </div>
+                    <div class="layout-colors" style="margin-top:10px;">
+                        <label><input type="color" data-layout="ritualColor"> Ritual</label>
+                        <label><input type="color" data-layout="concColor"> Concentration</label>
+                    </div>
+                </div>
+
+                <div class="layout-section">
+                    <h4>Body text</h4>
+                    <div class="layout-sliders">
+                        <label class="layout-slider">Stats
+                            <input type="range" data-layout="fontStats" min="5" max="14" step="0.5">
+                            <span class="layout-value"></span>
+                        </label>
+                        <label class="layout-slider">Description
+                            <input type="range" data-layout="fontDesc" min="5" max="14" step="0.5">
+                            <span class="layout-value"></span>
+                        </label>
+                        <label class="layout-slider">Higher levels
+                            <input type="range" data-layout="fontHigher" min="5" max="14" step="0.5">
+                            <span class="layout-value"></span>
+                        </label>
+                        <label class="layout-slider">Line spacing
+                            <input type="range" data-layout="lineHeight" min="1" max="2" step="0.05">
+                            <span class="layout-value"></span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="layout-section">
+                    <h4>Footer</h4>
+                    <div class="layout-sliders">
+                        <label class="layout-slider">Footer text
+                            <input type="range" data-layout="fontFooter" min="5" max="14" step="0.5">
+                            <span class="layout-value"></span>
+                        </label>
+                    </div>
+                    <div class="layout-checks" style="margin-top:10px;">
+                        <label><input type="checkbox" data-layout="showClasses"> Show classes</label>
+                        <label><input type="checkbox" data-layout="showSource"> Show source</label>
+                    </div>
+                </div>
+
+                <button id="resetLayout" class="secondary" style="font-size:13px;">Reset to defaults</button>
+                <p class="hint" style="margin-top:8px;">Changing the Font Size preset resets these text sizes.</p>
+            </div>
         </div>
 
         <div class="custom-spell-panel">
@@ -1289,6 +1508,28 @@
         let allSpells = [];
         let selectedSpells = new Set();
 
+        // Card layout options. `sizes` holds only the values the user has moved
+        // away from the current Font Size preset; anything absent follows the preset.
+        const defaultLayout = {
+            tagPosition: 'own',
+            showClasses: true,
+            showSource: true,
+            ritualColor: '#9b59b6',
+            concColor: '#e67e22',
+            monoColor: '#666666',
+            sizes: {}
+        };
+        let layout = { ...defaultLayout, sizes: {} };
+        try {
+            const savedLayout = JSON.parse(localStorage.getItem('cardLayout') || 'null');
+            if (savedLayout) {
+                layout = { ...layout, ...savedLayout, sizes: { ...(savedLayout.sizes || {}) } };
+                // Migrate the earlier boolean form of the tag position
+                if (savedLayout.badgesInline && !savedLayout.tagPosition) layout.tagPosition = 'inline';
+                delete layout.badgesInline;
+            }
+        } catch (e) { /* ignore malformed saved layout */ }
+
         // DOM elements
         const fileInput = document.getElementById('fileInput');
         const classSelect = document.getElementById('classSelect');
@@ -1311,6 +1552,8 @@
         const colorClassOtherWrap = document.getElementById('colorClassOtherWrap');
         const otherClassColor = document.getElementById('otherClassColor');
         const customizeLink = document.getElementById('customizeClassColors');
+        const monoColorWrap = document.getElementById('monoColorWrap');
+        const monoColorInput = document.getElementById('monoColor');
         const colorModal = document.getElementById('colorModal');
         const colorPickerGrid = document.getElementById('colorPickerGrid');
         const cardBacksCheckbox = document.getElementById('cardBacks');
@@ -1341,6 +1584,8 @@
         } catch (e) { /* ignore */ }
 
         // Apply card size, font size, and color mode classes
+        let stylePassPending = false;
+
         function updateCardStyles() {
             cardsContainer.className = 'cards-container';
             cardsContainer.classList.add(`size-${cardSizeSelect.value}`);
@@ -1351,6 +1596,18 @@
             if (colorMode !== 'school') {
                 cardsContainer.classList.add(`color-${colorMode}`);
             }
+
+            // Apply layout options (className was just rebuilt, so re-add these)
+            if (layout.tagPosition !== 'own') cardsContainer.classList.add(`layout-tags-${layout.tagPosition}`);
+            if (!layout.showClasses) cardsContainer.classList.add('layout-hide-classes');
+            if (!layout.showSource) cardsContainer.classList.add('layout-hide-source');
+            cardsContainer.style.setProperty('--ritual-color', layout.ritualColor);
+            cardsContainer.style.setProperty('--conc-color', layout.concColor);
+            cardsContainer.style.setProperty('--mono-color', layout.monoColor);
+
+            // The monochrome color picker only applies to monochrome mode
+            monoColorWrap.style.display = colorMode === 'mono' ? 'inline-flex' : 'none';
+            monoColorInput.value = layout.monoColor;
             // Clear previous highlight attributes
             document.querySelectorAll('.spell-card[data-highlighted]').forEach(card => {
                 card.removeAttribute('data-highlighted');
@@ -1415,14 +1672,25 @@
                 cardsContainer.style.removeProperty('--other-color');
             }
 
-            requestAnimationFrame(() => {
-                adjustCardOverflow();
-                generateCardBacks();
-            });
+            // Refresh the preview synchronously. It is cheap (one card), and doing it
+            // here rather than only in the deferred pass below means it can never be
+            // left showing stale sizes if that pass is skipped or throttled.
+            updateBackPreview();
+
+            // Coalesce repeated calls (e.g. dragging a layout slider) into one
+            // repagination per frame
+            if (!stylePassPending) {
+                stylePassPending = true;
+                requestAnimationFrame(() => {
+                    stylePassPending = false;
+                    adjustCardOverflow();
+                    generateCardBacks();
+                });
+            }
         }
 
         cardSizeSelect.addEventListener('change', updateCardStyles);
-        fontSizeSelect.addEventListener('change', updateCardStyles);
+        fontSizeSelect.addEventListener('change', resetLayoutSizesToPreset);
         colorModeSelect.addEventListener('change', updateCardStyles);
         classSelect.addEventListener('change', () => {
             if (colorModeSelect.value === 'class') updateCardStyles();
@@ -1537,9 +1805,19 @@
             backPreview.innerHTML = '';
             if (!cardBacksCheckbox.checked) return;
 
-            // Create a wrapper with the current size class so CSS variables are available
+            // Create a wrapper with the current size class so CSS variables are available.
+            // The color mode class goes on too, so the preview shows what the mode does
+            // to the back (greyscale, for instance).
             const wrapper = document.createElement('div');
             wrapper.className = `size-${cardSizeSelect.value} font-${fontSizeSelect.value}`;
+            if (colorModeSelect.value !== 'school') wrapper.classList.add(`color-${colorModeSelect.value}`);
+            // The preview lives outside the cards container, so mirror the layout
+            // overrides set there or it won't match what actually prints
+            for (const prop of cardsContainer.style) {
+                if (prop.startsWith('--')) {
+                    wrapper.style.setProperty(prop, cardsContainer.style.getPropertyValue(prop));
+                }
+            }
             wrapper.style.display = 'inline-block';
 
             // Use a real card if available, or build a fake one
@@ -1589,17 +1867,19 @@
 
             if (!cardBacksCheckbox.checked || allCards.length === 0) {
                 cardsContainer.classList.remove('has-backs');
+                updateBackPreview();
                 return;
             }
             cardsContainer.classList.add('has-backs');
 
-            const layout = pageLayouts[cardSizeSelect.value] || pageLayouts.poker;
+            // Named pageLayout, not layout — `layout` is the global card layout options
+            const pageLayout = pageLayouts[cardSizeSelect.value] || pageLayouts.poker;
             const flipMode = backFlip.value;
 
             // Group cards into pages
             const pages = [];
-            for (let i = 0; i < allCards.length; i += layout.perPage) {
-                pages.push(allCards.slice(i, i + layout.perPage));
+            for (let i = 0; i < allCards.length; i += pageLayout.perPage) {
+                pages.push(allCards.slice(i, i + pageLayout.perPage));
             }
 
             // Rebuild container with interleaved front/back pages
@@ -1611,7 +1891,7 @@
                 frontPage.className = 'front-page';
                 pageFronts.forEach(card => frontPage.appendChild(card));
                 // Pad incomplete pages with spacers
-                for (let i = pageFronts.length; i < layout.perPage; i++) {
+                for (let i = pageFronts.length; i < pageLayout.perPage; i++) {
                     const spacer = document.createElement('div');
                     spacer.className = 'card-spacer';
                     frontPage.appendChild(spacer);
@@ -1621,7 +1901,7 @@
                 // Back page with mirrored order
                 const backPage = document.createElement('div');
                 backPage.className = 'back-page';
-                const mirrored = mirrorOrder(pageFronts, layout.cols, layout.rows, flipMode);
+                const mirrored = mirrorOrder(pageFronts, pageLayout.cols, pageLayout.rows, flipMode);
                 mirrored.forEach(frontCard => {
                     if (frontCard) {
                         backPage.appendChild(createCardBack(frontCard));
@@ -1738,8 +2018,112 @@
             updateCardStyles();
         });
 
+        // ===== CARD LAYOUT OPTIONS =====
+        // Slider key -> the CSS variable it drives, and the unit it is measured in
+        const layoutSizeVars = {
+            fontName: ['--font-name', 'pt'],
+            fontSchool: ['--font-school', 'pt'],
+            fontStats: ['--font-stats', 'pt'],
+            fontDesc: ['--font-desc', 'pt'],
+            fontHigher: ['--font-higher', 'pt'],
+            fontFooter: ['--font-footer', 'pt'],
+            lineHeight: ['--line-height', ''],
+            levelSize: ['--level-size', 'px'],
+            fontBadge: ['--font-badge', 'pt']
+        };
+
+        const layoutForm = document.getElementById('layoutForm');
+
+        function saveLayout() {
+            localStorage.setItem('cardLayout', JSON.stringify(layout));
+        }
+
+        // Effective value of a size, whether it comes from the preset or the user
+        function effectiveSize(key) {
+            if (key in layout.sizes) return layout.sizes[key];
+            const [cssVar] = layoutSizeVars[key];
+            return parseFloat(getComputedStyle(cardsContainer).getPropertyValue(cssVar));
+        }
+
+        function applyLayoutSizes() {
+            for (const [key, [cssVar, unit]] of Object.entries(layoutSizeVars)) {
+                if (key in layout.sizes) {
+                    cardsContainer.style.setProperty(cssVar, layout.sizes[key] + unit);
+                } else {
+                    cardsContainer.style.removeProperty(cssVar);
+                }
+            }
+        }
+
+        function syncLayoutControls() {
+            layoutForm.querySelectorAll('[data-layout]').forEach(input => {
+                const key = input.dataset.layout;
+                if (input.type === 'range') {
+                    const value = effectiveSize(key);
+                    input.value = value;
+                    const unit = layoutSizeVars[key][1];
+                    input.parentElement.querySelector('.layout-value').textContent =
+                        (unit === '' ? value.toFixed(2) : value + unit);
+                } else if (input.type === 'checkbox') {
+                    input.checked = layout[key];
+                } else {
+                    input.value = layout[key];
+                }
+            });
+        }
+
+        function applyLayout() {
+            applyLayoutSizes();
+            updateCardStyles();
+            syncLayoutControls();
+        }
+
+        // The Font Size preset owns the text sizes, so picking a new one drops
+        // the user's size overrides rather than silently ignoring the preset
+        function resetLayoutSizesToPreset() {
+            layout.sizes = {};
+            saveLayout();
+            // Apply the new preset before re-seeding, or the sliders read the old one
+            applyLayout();
+        }
+
+        document.getElementById('toggleLayout').addEventListener('click', () => {
+            layoutForm.classList.toggle('active');
+            if (layoutForm.classList.contains('active')) syncLayoutControls();
+        });
+
+        layoutForm.addEventListener('input', (e) => {
+            const input = e.target.closest('[data-layout]');
+            if (!input) return;
+            const key = input.dataset.layout;
+
+            if (input.type === 'range') {
+                layout.sizes[key] = parseFloat(input.value);
+            } else if (input.type === 'checkbox') {
+                layout[key] = input.checked;
+            } else {
+                layout[key] = input.value;
+            }
+            saveLayout();
+            applyLayout();
+        });
+
+        monoColorInput.addEventListener('input', () => {
+            layout.monoColor = monoColorInput.value;
+            saveLayout();
+            updateCardStyles();
+        });
+
+        document.getElementById('resetLayout').addEventListener('click', () => {
+            layout = { ...defaultLayout, sizes: {} };
+            localStorage.removeItem('cardLayout');
+            applyLayout();
+        });
+
         // Initialize with default styles
+        applyLayoutSizes();
         updateCardStyles();
+        syncLayoutControls();
 
         // Show status message
         function showStatus(message, type = 'info') {
@@ -2823,8 +3207,10 @@
                             <span class="card-name">${spell.name}</span>
                             <span class="card-level">${levelDisplay}</span>
                         </div>
-                        <div class="card-school">${schoolLine}</div>
-                        ${badges.length ? `<div class="card-badges">${badges.join('')}</div>` : ''}
+                        <div class="card-school-row">
+                            <div class="card-school">${schoolLine}</div>
+                            ${badges.length ? `<div class="card-badges">${badges.join('')}</div>` : ''}
+                        </div>
                     </div>
 
                     <div class="card-stats">
