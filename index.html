@@ -3020,7 +3020,7 @@
                         return;
                     }
                 }
-            } catch (e) { /* corrupt cache, fall through to SRD */ }
+            } catch (e) { console.warn('Cached 5etools data could not be used:', e); }
 
             try {
                 // Try SRD spells first (shipped with the site)
@@ -3059,7 +3059,9 @@
                 }
             }
         }
-        tryLoadDefaultSpells();
+        // Startup runs at the very end of the script — see the call after the last
+        // handler. It reads consts declared further down (the share helpers among
+        // them), and calling it here would hit them before initialization.
 
         // Get selected levels
         function getSelectedLevels() {
@@ -4043,6 +4045,9 @@
             customSpellForm.classList.remove('active');
             showStatus(`Added custom spell "${spell.name}"`, 'success');
         });
+
+        // Everything above is declared; safe to load spell data and act on the URL
+        tryLoadDefaultSpells();
     </script>
 </body>
 </html>
