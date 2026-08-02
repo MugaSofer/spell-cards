@@ -3383,6 +3383,25 @@
             return select.querySelector('option[selected]')?.value ?? select.options[0]?.value;
         }
 
+        const LEVEL_KEYS = LEVEL_LABELS.map((_, i) => String(i));
+
+        function sameColor(a, b) {
+            return String(a).toLowerCase() === String(b).toLowerCase();
+        }
+
+        // Whole palette as one hex run, or null when nothing was changed
+        function packPalette(colors, defaults, order) {
+            if (order.every(key => sameColor(colors[key], defaults[key]))) return null;
+            return order.map(key => colors[key].replace('#', '')).join('');
+        }
+
+        function unpackPalette(raw, order, target) {
+            if (!raw || raw.length !== order.length * 6 || !/^[0-9a-f]+$/i.test(raw)) return;
+            order.forEach((key, i) => {
+                target[key] = '#' + raw.slice(i * 6, i * 6 + 6).toLowerCase();
+            });
+        }
+
         function layoutShareParams() {
             const p = new URLSearchParams();
 
@@ -3393,6 +3412,21 @@
             if (layout.ritualColor !== defaultLayout.ritualColor) p.set('l_ritual', layout.ritualColor.replace('#', ''));
             if (layout.concColor !== defaultLayout.concColor) p.set('l_conc', layout.concColor.replace('#', ''));
             if (layout.monoColor !== defaultLayout.monoColor) p.set('l_mono', layout.monoColor.replace('#', ''));
+
+            // Schools and levels are fixed, ordered sets, so their palettes pack
+            // positionally: six hex characters each, no keys needed
+            const packed = packPalette(schoolColors, defaultSchoolColors, SCHOOLS);
+            if (packed) p.set('l_school', packed);
+            const packedLevels = packPalette(levelColors, defaultLevelColors, LEVEL_KEYS);
+            if (packedLevels) p.set('l_level', packedLevels);
+
+            // Classes stay keyed — the list has grown before (Artificer), and a
+            // positional scheme would silently mis-map older links if it grows again
+            for (const cls of Object.keys(defaultClassColors)) {
+                if (!sameColor(classColors[cls], defaultClassColors[cls])) {
+                    p.set('l_c_' + cls, classColors[cls].replace('#', ''));
+                }
+            }
 
             for (const [name, get] of shareSelects) {
                 const select = get();
@@ -3414,6 +3448,9 @@
             // only carries non-default values, so merging would leave the sharer's
             // defaults overridden by whatever the recipient happens to have saved
             layout = { ...defaultLayout, sizes: {} };
+            classColors = { ...defaultClassColors };
+            schoolColors = { ...defaultSchoolColors };
+            levelColors = { ...defaultLevelColors };
             for (const [, get] of shareSelects) {
                 const select = get();
                 select.value = selectDefault(select);
@@ -3439,6 +3476,13 @@
             for (const [param, prop] of [['l_ritual', 'ritualColor'], ['l_conc', 'concColor'], ['l_mono', 'monoColor']]) {
                 const hex = params.get(param);
                 if (hex && /^[0-9a-f]{6}$/i.test(hex)) layout[prop] = '#' + hex.toLowerCase();
+            }
+
+            unpackPalette(params.get('l_school'), SCHOOLS, schoolColors);
+            unpackPalette(params.get('l_level'), LEVEL_KEYS, levelColors);
+            for (const cls of Object.keys(defaultClassColors)) {
+                const hex = params.get('l_c_' + cls);
+                if (hex && /^[0-9a-f]{6}$/i.test(hex)) classColors[cls] = '#' + hex.toLowerCase();
             }
 
             for (const [name, get] of shareSelects) {
