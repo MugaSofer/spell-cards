@@ -1703,6 +1703,42 @@
             if (saved) Object.assign(classColors, saved);
         } catch (e) { /* ignore */ }
 
+        // School and level palettes are read back out of the stylesheet, so the CSS
+        // stays the one place the default colours are written down
+        const SCHOOLS = ['Abjuration', 'Conjuration', 'Divination', 'Enchantment',
+                         'Evocation', 'Illusion', 'Necromancy', 'Transmutation'];
+        const LEVEL_LABELS = ['Cantrip', '1st', '2nd', '3rd', '4th', '5th', '6th', '7th', '8th', '9th'];
+
+        function schoolVar(school) { return `--school-${school.toLowerCase()}`; }
+        function levelVar(level) { return `--level-${level}`; }
+
+        function readCssColors(entries) {
+            const root = getComputedStyle(document.documentElement);
+            const out = {};
+            for (const [key, cssVar] of entries) out[key] = root.getPropertyValue(cssVar).trim();
+            return out;
+        }
+
+        const defaultSchoolColors = readCssColors(SCHOOLS.map(s => [s, schoolVar(s)]));
+        const defaultLevelColors = readCssColors(LEVEL_LABELS.map((_, i) => [String(i), levelVar(i)]));
+
+        function loadPalette(storageKey, defaults) {
+            const colors = Object.assign({}, defaults);
+            try {
+                const saved = JSON.parse(localStorage.getItem(storageKey));
+                if (saved) {
+                    // Only take keys we know about, and only if they look like colours
+                    for (const [key, value] of Object.entries(saved)) {
+                        if (key in defaults && /^#[0-9a-f]{6}$/i.test(value)) colors[key] = value;
+                    }
+                }
+            } catch (e) { /* ignore malformed saved palette */ }
+            return colors;
+        }
+
+        let schoolColors = loadPalette('schoolColors', defaultSchoolColors);
+        let levelColors = loadPalette('levelColors', defaultLevelColors);
+
         // Apply card size, font size, and color mode classes
         let stylePassPending = false;
 
@@ -1725,6 +1761,14 @@
             cardsContainer.style.setProperty('--conc-color', layout.concColor);
             cardsContainer.style.setProperty('--mono-color', layout.monoColor);
 
+            // Custom school and level palettes override the stylesheet defaults
+            for (const [school, color] of Object.entries(schoolColors)) {
+                cardsContainer.style.setProperty(schoolVar(school), color);
+            }
+            for (const [level, color] of Object.entries(levelColors)) {
+                cardsContainer.style.setProperty(levelVar(level), color);
+            }
+
             // The monochrome color picker only applies to monochrome mode
             monoColorWrap.style.display = colorMode === 'mono' ? 'inline-flex' : 'none';
             monoColorInput.value = layout.monoColor;
@@ -1733,7 +1777,12 @@
                 card.removeAttribute('data-highlighted');
             });
 
-            customizeLink.style.display = colorMode === 'class' ? 'inline' : 'none';
+            // School, level and class modes each have a palette worth customising
+            const palette = activePalette();
+            customizeLink.style.display = palette ? 'inline' : 'none';
+            if (palette) customizeLink.textContent = `Customize ${palette.title.toLowerCase()}...`;
+            // Keep an open modal in step if the mode changes underneath it
+            if (palette && colorModal.style.display === 'flex') populateColorPickers();
 
             if (colorMode === 'class') {
                 const cls = classSelect.value;
@@ -2097,13 +2146,37 @@
             cardsContainer.style.setProperty('--back-offset', `${backOffset.value}mm`);
         });
 
-        // ===== CLASS COLOR CUSTOMIZATION MODAL =====
+        // ===== COLOR CUSTOMIZATION MODAL =====
+        // One modal serves whichever palette the current color mode uses
+        function activePalette() {
+            switch (colorModeSelect.value) {
+                case 'class':
+                    return { title: 'Class Colors', storageKey: 'classColors',
+                             colors: classColors, defaults: defaultClassColors,
+                             items: Object.keys(defaultClassColors).map(k => [k, k]) };
+                case 'school':
+                    return { title: 'School Colors', storageKey: 'schoolColors',
+                             colors: schoolColors, defaults: defaultSchoolColors,
+                             items: SCHOOLS.map(s => [s, s]) };
+                case 'level':
+                    return { title: 'Level Colors', storageKey: 'levelColors',
+                             colors: levelColors, defaults: defaultLevelColors,
+                             items: LEVEL_LABELS.map((label, i) => [String(i), label]) };
+                default:
+                    return null;
+            }
+        }
+
         function populateColorPickers() {
-            colorPickerGrid.innerHTML = Object.keys(defaultClassColors).map(cls => `
+            const palette = activePalette();
+            if (!palette) return;
+            document.getElementById('colorModalTitle').textContent = palette.title;
+            colorPickerGrid.innerHTML = palette.items.map(([key, label]) => `
                 <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
-                    <input type="color" value="${classColors[cls]}" data-class="${cls}"
+                    <input type="color" value="${palette.colors[key]}" data-key="${key}"
+                           aria-label="${label}"
                            style="width:32px; height:24px; border:1px solid #ccc; border-radius:3px; padding:0; cursor:pointer;">
-                    <span style="font-size:14px;">${cls}</span>
+                    <span style="font-size:14px;">${label}</span>
                 </label>
             `).join('');
         }
@@ -2153,17 +2226,19 @@
         });
 
         colorPickerGrid.addEventListener('input', (e) => {
-            if (e.target.type === 'color') {
-                const cls = e.target.dataset.class;
-                classColors[cls] = e.target.value;
-                localStorage.setItem('classColors', JSON.stringify(classColors));
-                updateCardStyles();
-            }
+            if (e.target.type !== 'color') return;
+            const palette = activePalette();
+            if (!palette) return;
+            palette.colors[e.target.dataset.key] = e.target.value;
+            localStorage.setItem(palette.storageKey, JSON.stringify(palette.colors));
+            updateCardStyles();
         });
 
         document.getElementById('resetClassColors').addEventListener('click', () => {
-            Object.assign(classColors, defaultClassColors);
-            localStorage.removeItem('classColors');
+            const palette = activePalette();
+            if (!palette) return;
+            Object.assign(palette.colors, palette.defaults);
+            localStorage.removeItem(palette.storageKey);
             populateColorPickers();
             updateCardStyles();
         });
@@ -3218,6 +3293,13 @@
 
         // ===== SHARING & IMPORT/EXPORT =====
 
+        // Roughly where share links stop being reliable. The lower bound is the
+        // conservative cross-platform guideline, where link previews and chat
+        // clients start truncating; the upper one is where typical server
+        // request-line limits reject the request before the page loads.
+        const SHARE_URL_WARN = 1800;
+        const SHARE_URL_LIMIT = 7500;
+
         // Card appearance carried in share links, so the recipient sees what the
         // sharer saw. Only values that differ from the defaults are included, which
         // keeps ordinary links short.
@@ -3313,8 +3395,24 @@
             const names = Array.from(selectedSpells).map(n => encodeURIComponent(n)).join(',');
             const extras = layoutShareParams().toString();
             const url = `${location.origin}${location.pathname}?spells=${names}${extras ? '&' + extras : ''}`;
+
+            // Spell names in the URL add up fast: past a few hundred characters a
+            // link starts getting truncated by chat apps, and past a few thousand
+            // servers reject the request outright. Say so rather than handing over
+            // a link that fails silently at the other end.
+            const count = selectedSpells.size;
+            let message = 'Share link copied to clipboard!';
+            let type = 'success';
+            if (url.length > SHARE_URL_LIMIT) {
+                message = `Link copied, but ${count} spells make it ${url.length.toLocaleString()} characters — too long for most browsers and servers to accept. Use Export JSON or Save Spell List to share a list this big.`;
+                type = 'error';
+            } else if (url.length > SHARE_URL_WARN) {
+                message = `Link copied — but at ${url.length.toLocaleString()} characters it may be cut short by chat apps and messaging clients. For a list this size, Export JSON or Save Spell List is more reliable.`;
+                type = 'info';
+            }
+
             navigator.clipboard.writeText(url).then(() => {
-                showStatus('Share link copied to clipboard!', 'success');
+                showStatus(message, type);
             }).catch(() => {
                 prompt('Copy this link to share your spell list:', url);
             });
