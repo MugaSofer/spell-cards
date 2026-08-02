@@ -252,6 +252,12 @@
             font-weight: 600;
         }
 
+        /* The All toggle is a control over the others, not a level of its own */
+        .level-checkboxes .level-all {
+            background: #e3eef7;
+            margin-right: 4px;
+        }
+
         button {
             background: #3498db;
             color: white;
@@ -1160,6 +1166,7 @@
             <div class="control-group levels-group">
                 <label>Spell Levels</label>
                 <div class="level-checkboxes" id="levelCheckboxes">
+                    <label class="level-all"><input type="checkbox" id="levelAll" data-level-all><span>All</span></label>
                     <label><input type="checkbox" value="0" checked><span>Cantrip</span></label>
                     <label><input type="checkbox" value="1" checked><span>1st</span></label>
                     <label><input type="checkbox" value="2" checked><span>2nd</span></label>
@@ -1654,6 +1661,7 @@
         const fileInput = document.getElementById('fileInput');
         const classSelect = document.getElementById('classSelect');
         const levelCheckboxes = document.getElementById('levelCheckboxes');
+        const levelAll = document.getElementById('levelAll');
         const spellSearch = document.getElementById('spellSearch');
         const autocomplete = document.getElementById('autocomplete');
         const selectedSpellsList = document.getElementById('selectedSpellsList');
@@ -3064,10 +3072,34 @@
         // them), and calling it here would hit them before initialization.
 
         // Get selected levels
-        function getSelectedLevels() {
-            const checkboxes = levelCheckboxes.querySelectorAll('input:checked');
-            return Array.from(checkboxes).map(cb => parseInt(cb.value));
+        // The All toggle lives in the same container, so exclude it — otherwise it
+        // would contribute a NaN level
+        function levelBoxes() {
+            return Array.from(levelCheckboxes.querySelectorAll('input[type="checkbox"]:not([data-level-all])'));
         }
+
+        function getSelectedLevels() {
+            return levelBoxes().filter(cb => cb.checked).map(cb => parseInt(cb.value));
+        }
+
+        // Keep All in step: checked when every level is, "mixed" when only some are
+        function syncLevelAll() {
+            const boxes = levelBoxes();
+            const checked = boxes.filter(cb => cb.checked).length;
+            levelAll.checked = checked === boxes.length;
+            levelAll.indeterminate = checked > 0 && checked < boxes.length;
+        }
+
+        levelAll.addEventListener('change', () => {
+            levelBoxes().forEach(cb => { cb.checked = levelAll.checked; });
+            levelAll.indeterminate = false;
+        });
+
+        levelCheckboxes.addEventListener('change', (e) => {
+            if (e.target !== levelAll) syncLevelAll();
+        });
+
+        syncLevelAll();
 
         // Add filtered spells (by class, subclass, level, school, source)
         document.getElementById('addClassSpells').addEventListener('click', () => {
