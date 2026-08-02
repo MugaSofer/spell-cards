@@ -3218,6 +3218,92 @@
 
         // ===== SHARING & IMPORT/EXPORT =====
 
+        // Card appearance carried in share links, so the recipient sees what the
+        // sharer saw. Only values that differ from the defaults are included, which
+        // keeps ordinary links short.
+        const shareSelects = [
+            ['l_size', () => cardSizeSelect],
+            ['l_font', () => fontSizeSelect],
+            ['l_color', () => colorModeSelect],
+            ['l_long', () => overflowModeSelect]
+        ];
+
+        function selectDefault(select) {
+            return select.querySelector('option[selected]')?.value ?? select.options[0]?.value;
+        }
+
+        function layoutShareParams() {
+            const p = new URLSearchParams();
+
+            for (const [key, value] of Object.entries(layout.sizes)) p.set('l_' + key, String(value));
+            if (layout.tagPosition !== defaultLayout.tagPosition) p.set('l_tags', layout.tagPosition);
+            if (!layout.showClasses) p.set('l_classes', '0');
+            if (!layout.showSource) p.set('l_source', '0');
+            if (layout.ritualColor !== defaultLayout.ritualColor) p.set('l_ritual', layout.ritualColor.replace('#', ''));
+            if (layout.concColor !== defaultLayout.concColor) p.set('l_conc', layout.concColor.replace('#', ''));
+            if (layout.monoColor !== defaultLayout.monoColor) p.set('l_mono', layout.monoColor.replace('#', ''));
+
+            for (const [name, get] of shareSelects) {
+                const select = get();
+                if (select.value !== selectDefault(select)) p.set(name, select.value);
+            }
+            // Class mode is meaningless without knowing which class is highlighted
+            if (colorModeSelect.value === 'class' && classSelect.value) p.set('l_hclass', classSelect.value);
+
+            return p;
+        }
+
+        // Apply appearance from a shared link. Deliberately does not save: a link
+        // should not overwrite what the recipient has set for themselves.
+        function applyLayoutFromURL(params) {
+            const keys = [...params.keys()];
+            if (!keys.some(k => k.startsWith('l_'))) return false;
+
+            // Start from defaults rather than the recipient's own settings: the link
+            // only carries non-default values, so merging would leave the sharer's
+            // defaults overridden by whatever the recipient happens to have saved
+            layout = { ...defaultLayout, sizes: {} };
+            for (const [, get] of shareSelects) {
+                const select = get();
+                select.value = selectDefault(select);
+            }
+
+            for (const key of Object.keys(layoutSizeVars)) {
+                const raw = params.get('l_' + key);
+                if (raw === null) continue;
+                const value = parseFloat(raw);
+                if (!Number.isFinite(value)) continue;
+                // Clamp to the slider's own range so a hand-edited URL can't produce
+                // an unusable card
+                const slider = document.querySelector(`input[type=range][data-layout="${key}"]`);
+                const min = parseFloat(slider.min), max = parseFloat(slider.max);
+                layout.sizes[key] = Math.min(Math.max(value, min), max);
+            }
+
+            const tags = params.get('l_tags');
+            if (['own', 'inline', 'right'].includes(tags)) layout.tagPosition = tags;
+            if (params.get('l_classes') === '0') layout.showClasses = false;
+            if (params.get('l_source') === '0') layout.showSource = false;
+
+            for (const [param, prop] of [['l_ritual', 'ritualColor'], ['l_conc', 'concColor'], ['l_mono', 'monoColor']]) {
+                const hex = params.get(param);
+                if (hex && /^[0-9a-f]{6}$/i.test(hex)) layout[prop] = '#' + hex.toLowerCase();
+            }
+
+            for (const [name, get] of shareSelects) {
+                const value = params.get(name);
+                const select = get();
+                if (value && [...select.options].some(o => o.value === value)) select.value = value;
+            }
+            const highlightClass = params.get('l_hclass');
+            if (highlightClass && [...classSelect.options].some(o => o.value === highlightClass)) {
+                classSelect.value = highlightClass;
+            }
+
+            applyLayout();
+            return true;
+        }
+
         // Share Link — copy URL with spell names as query parameter
         document.getElementById('shareLink').addEventListener('click', () => {
             if (selectedSpells.size === 0) {
@@ -3225,7 +3311,8 @@
                 return;
             }
             const names = Array.from(selectedSpells).map(n => encodeURIComponent(n)).join(',');
-            const url = `${location.origin}${location.pathname}?spells=${names}`;
+            const extras = layoutShareParams().toString();
+            const url = `${location.origin}${location.pathname}?spells=${names}${extras ? '&' + extras : ''}`;
             navigator.clipboard.writeText(url).then(() => {
                 showStatus('Share link copied to clipboard!', 'success');
             }).catch(() => {
@@ -3236,8 +3323,15 @@
         // Load spells from URL on startup (called after spell data loads)
         function loadSpellsFromURL() {
             const params = new URLSearchParams(window.location.search);
+
+            // Appearance first, so the cards render as the sharer had them
+            const styled = applyLayoutFromURL(params);
+
             const spellsParam = params.get('spells');
-            if (!spellsParam) return;
+            if (!spellsParam) {
+                if (styled) showStatus('Card style applied from shared link', 'success');
+                return;
+            }
 
             const names = spellsParam.split(',').map(n => decodeURIComponent(n.trim())).filter(Boolean);
             let added = 0, skipped = 0;
@@ -3254,6 +3348,7 @@
                 updateSelectedSpellsList();
                 let msg = `Loaded ${added} spells from shared link`;
                 if (skipped > 0) msg += ` (${skipped} not found)`;
+                if (styled) msg += ', with the shared card style';
                 showStatus(msg, 'success');
             } else if (skipped > 0) {
                 showStatus(`None of the ${skipped} shared spells were found in the current data`, 'error');
