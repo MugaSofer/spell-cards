@@ -1655,7 +1655,7 @@
                 if (savedLayout.badgesInline && !savedLayout.tagPosition) layout.tagPosition = 'inline';
                 delete layout.badgesInline;
             }
-        } catch (e) { /* ignore malformed saved layout */ }
+        } catch (e) { console.warn('Saved card layout could not be read; using defaults:', e); }
 
         // DOM elements
         const fileInput = document.getElementById('fileInput');
@@ -1709,7 +1709,7 @@
         try {
             const saved = JSON.parse(localStorage.getItem('classColors'));
             if (saved) Object.assign(classColors, saved);
-        } catch (e) { /* ignore */ }
+        } catch (e) { console.warn('Saved class colours could not be read; using defaults:', e); }
 
         // School and level palettes are read back out of the stylesheet, so the CSS
         // stays the one place the default colours are written down
@@ -1740,7 +1740,7 @@
                         if (key in defaults && /^#[0-9a-f]{6}$/i.test(value)) colors[key] = value;
                     }
                 }
-            } catch (e) { /* ignore malformed saved palette */ }
+            } catch (e) { console.warn(`Saved palette "${storageKey}" could not be read; using defaults:`, e); }
             return colors;
         }
 
@@ -3043,7 +3043,7 @@
                             spells2024.forEach(s => s.source = 'SRD 2024');
                             allSpells = allSpells.concat(spells2024);
                         }
-                    } catch (e) { /* 2024 SRD not available, continue with 2014 only */ }
+                    } catch (e) { console.warn('2024 SRD data unavailable; continuing with 2014 only:', e); }
                     showSrdBanner();
                     populateSourceDropdown();
                     populateSubclassDropdown();
@@ -3062,6 +3062,7 @@
                     showStatus(`Loaded ${allSpells.length} spells from spells.json`, 'success');
                 }
             } catch (e) {
+                console.warn('Default spell data could not be loaded:', e);
                 if (allSpells.length === 0) {
                     showStatus('Load spell data using the button above.', 'info');
                 }
@@ -3475,7 +3476,7 @@
                     const packed = `${base}?s=${await compressSpellNames(names)}${suffix}`;
                     if (packed.length < url.length) url = packed;
                 } catch (e) {
-                    /* fall back to the readable link */
+                    console.warn('Could not compress the spell list; sharing the full-length link instead:', e);
                 }
             }
 
@@ -3518,6 +3519,7 @@
                 try {
                     names = await decompressSpellNames(packed);
                 } catch (e) {
+                    console.warn('Share link payload could not be decoded:', e);
                     showStatus('This share link is damaged and could not be read', 'error');
                     return;
                 }
@@ -4003,7 +4005,7 @@
                         allSpells.push(spell);
                     }
                 });
-            } catch (e) { /* ignore bad data */ }
+            } catch (e) { console.warn('Saved custom spells could not be read:', e); }
         }
 
         function saveCustomSpells() {
