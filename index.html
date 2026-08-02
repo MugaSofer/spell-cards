@@ -3015,7 +3015,7 @@
                         populateSourceDropdown();
                         populateSubclassDropdown();
                         loadCustomSpells();
-                        loadSpellsFromURL();
+                        await loadSpellsFromURL();
                         show5etoolsBanner(allSpells.length);
                         return;
                     }
@@ -3040,7 +3040,7 @@
                     populateSourceDropdown();
                     populateSubclassDropdown();
                     loadCustomSpells();
-                    loadSpellsFromURL();
+                    await loadSpellsFromURL();
                     return;
                 }
                 // Fall back to full spells.json if present
@@ -3050,7 +3050,7 @@
                     populateSourceDropdown();
                 populateSubclassDropdown();
                     loadCustomSpells();
-                    loadSpellsFromURL();
+                    await loadSpellsFromURL();
                     showStatus(`Loaded ${allSpells.length} spells from spells.json`, 'success');
                 }
             } catch (e) {
@@ -3300,6 +3300,43 @@
         const SHARE_URL_WARN = 1800;
         const SHARE_URL_LIMIT = 7500;
 
+        // Long spell lists are shared as a compressed payload (?s=) instead of
+        // readable names (?spells=). Names repeat a lot of substrings, so they
+        // deflate well. Both forms are still accepted when loading, so links made
+        // before this existed keep working.
+        const SHARE_SEPARATOR = '\n';
+        const compressionAvailable =
+            typeof CompressionStream === 'function' && typeof DecompressionStream === 'function';
+
+        function bytesToBase64Url(bytes) {
+            let binary = '';
+            const chunk = 0x8000;
+            for (let i = 0; i < bytes.length; i += chunk) {
+                binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunk));
+            }
+            return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+        }
+
+        function base64UrlToBytes(text) {
+            const binary = atob(text.replace(/-/g, '+').replace(/_/g, '/'));
+            const bytes = new Uint8Array(binary.length);
+            for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+            return bytes;
+        }
+
+        async function compressSpellNames(names) {
+            const input = new TextEncoder().encode(names.join(SHARE_SEPARATOR));
+            const stream = new Blob([input]).stream().pipeThrough(new CompressionStream('deflate-raw'));
+            return bytesToBase64Url(new Uint8Array(await new Response(stream).arrayBuffer()));
+        }
+
+        async function decompressSpellNames(encoded) {
+            const bytes = base64UrlToBytes(encoded);
+            const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('deflate-raw'));
+            const text = await new Response(stream).text();
+            return text.split(SHARE_SEPARATOR).map(n => n.trim()).filter(Boolean);
+        }
+
         // Card appearance carried in share links, so the recipient sees what the
         // sharer saw. Only values that differ from the defaults are included, which
         // keeps ordinary links short.
@@ -3387,14 +3424,26 @@
         }
 
         // Share Link — copy URL with spell names as query parameter
-        document.getElementById('shareLink').addEventListener('click', () => {
+        document.getElementById('shareLink').addEventListener('click', async () => {
             if (selectedSpells.size === 0) {
                 showStatus('No spells selected to share', 'error');
                 return;
             }
-            const names = Array.from(selectedSpells).map(n => encodeURIComponent(n)).join(',');
+            const names = Array.from(selectedSpells);
             const extras = layoutShareParams().toString();
-            const url = `${location.origin}${location.pathname}?spells=${names}${extras ? '&' + extras : ''}`;
+            const base = `${location.origin}${location.pathname}`;
+            const suffix = extras ? '&' + extras : '';
+            let url = `${base}?spells=${names.map(n => encodeURIComponent(n)).join(',')}${suffix}`;
+
+            // Keep the readable form while it fits; compress only once it doesn't
+            if (url.length > SHARE_URL_WARN && compressionAvailable) {
+                try {
+                    const packed = `${base}?s=${await compressSpellNames(names)}${suffix}`;
+                    if (packed.length < url.length) url = packed;
+                } catch (e) {
+                    /* fall back to the readable link */
+                }
+            }
 
             // Spell names in the URL add up fast: past a few hundred characters a
             // link starts getting truncated by chat apps, and past a few thousand
@@ -3419,19 +3468,36 @@
         });
 
         // Load spells from URL on startup (called after spell data loads)
-        function loadSpellsFromURL() {
+        async function loadSpellsFromURL() {
             const params = new URLSearchParams(window.location.search);
 
             // Appearance first, so the cards render as the sharer had them
             const styled = applyLayoutFromURL(params);
 
-            const spellsParam = params.get('spells');
-            if (!spellsParam) {
+            let names = null;
+            const packed = params.get('s');
+            if (packed) {
+                if (!compressionAvailable) {
+                    showStatus('This share link needs a newer browser to open', 'error');
+                    return;
+                }
+                try {
+                    names = await decompressSpellNames(packed);
+                } catch (e) {
+                    showStatus('This share link is damaged and could not be read', 'error');
+                    return;
+                }
+            } else {
+                const spellsParam = params.get('spells');
+                if (spellsParam) {
+                    names = spellsParam.split(',').map(n => decodeURIComponent(n.trim())).filter(Boolean);
+                }
+            }
+
+            if (!names || names.length === 0) {
                 if (styled) showStatus('Card style applied from shared link', 'success');
                 return;
             }
-
-            const names = spellsParam.split(',').map(n => decodeURIComponent(n.trim())).filter(Boolean);
             let added = 0, skipped = 0;
             names.forEach(name => {
                 const spell = allSpells.find(s => s.name.toLowerCase() === name.toLowerCase());
