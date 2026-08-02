@@ -521,6 +521,11 @@
             margin: 1px 0;
         }
 
+        /* Tail of a list item carried over from the previous card */
+        .card-description li.split-continued {
+            list-style: none;
+        }
+
         .card-higher-levels {
             font-size: var(--font-higher);
             border-top: 1px solid #ddd;
@@ -833,6 +838,11 @@
                 break-after: page;
             }
 
+            .back-page {
+                position: relative;
+                left: var(--back-offset, 0mm);
+            }
+
             .size-bridge .front-page, .size-bridge .back-page,
             .size-poker .front-page, .size-poker .back-page,
             .size-max6 .front-page, .size-max6 .back-page {
@@ -1115,6 +1125,11 @@
                             <option value="long">Long edge</option>
                             <option value="short">Short edge</option>
                         </select>
+                    </div>
+                    <div style="margin:4px 0;">
+                        <label for="backOffset">Alignment offset:</label>
+                        <input type="number" id="backOffset" value="0" min="-20" max="20" step="0.5" style="font-size:13px; width:55px; padding:2px 4px;">
+                        <span style="color:#999;">mm (+ shifts backs right)</span>
                     </div>
                     <div style="margin:8px 0 4px;">
                         <label style="font-size:12px; color:#888;">Preview:</label>
@@ -1675,6 +1690,11 @@
                     updateBackPreview();
                 }
             });
+        });
+
+        const backOffset = document.getElementById('backOffset');
+        backOffset.addEventListener('input', () => {
+            cardsContainer.style.setProperty('--back-offset', `${backOffset.value}mm`);
         });
 
         // ===== CLASS COLOR CUSTOMIZATION MODAL =====
@@ -2846,6 +2866,66 @@
             `;
         }
 
+        // Original (unpaginated) description HTML, so overflow handling can re-run
+        const originalDescHTML = new WeakMap();
+
+        // Move as much of `src`'s content into `dst` as fits, per the `fits` predicate.
+        // Splits down to the word, descending into inline/block markup as needed.
+        // Returns true if everything fit; anything left over stays in `src`, in order.
+        function fillWithFittingContent(src, dst, fits) {
+            while (src.firstChild) {                const node = src.firstChild;
+                dst.appendChild(node);
+                if (fits()) continue;
+
+                // Doesn't fit whole — put it back and see how much of it fits
+                if (node.nodeType === Node.TEXT_NODE) {
+                    dst.removeChild(node);
+                    const parts = node.nodeValue.split(/(\s+)/);
+                    const partial = document.createTextNode('');
+                    dst.appendChild(partial);
+
+                    // Largest word prefix that still fits
+                    let lo = 0, hi = parts.length;
+                    while (lo < hi) {
+                        const mid = Math.ceil((lo + hi) / 2);
+                        partial.nodeValue = parts.slice(0, mid).join('');
+                        if (fits()) lo = mid; else hi = mid - 1;
+                    }
+                    partial.nodeValue = parts.slice(0, lo).join('').replace(/\s+$/, '');
+                    if (!partial.nodeValue) dst.removeChild(partial);
+
+                    const rest = parts.slice(lo).join('').replace(/^\s+/, '');
+                    src.insertBefore(document.createTextNode(rest), src.firstChild);
+                    return false;
+                }
+
+                if (node.nodeType === Node.ELEMENT_NODE) {
+                    src.insertBefore(node, src.firstChild);
+                    const shell = node.cloneNode(false);
+                    dst.appendChild(shell);
+                    const complete = fillWithFittingContent(node, shell, fits);
+                    if (complete) {
+                        src.removeChild(node);
+                        continue;
+                    }
+                    if (shell.firstChild) {
+                        // The tail of this element lands on the next card — don't
+                        // repeat its bullet there
+                        node.classList.add('split-continued');
+                    } else {
+                        dst.removeChild(shell);
+                    }
+                    return false;
+                }
+
+                // Comments and friends — not splittable
+                dst.removeChild(node);
+                src.insertBefore(node, src.firstChild);
+                return false;
+            }
+            return true;
+        }
+
         // After rendering, check for overflow — truncate or split across cards
         function adjustCardOverflow() {
             const splitMode = overflowModeSelect.value === 'split';
@@ -2867,13 +2947,21 @@
                 const existingBadge = card.querySelector('.card-page-badge');
                 if (existingBadge) existingBadge.remove();
 
-                const contentHeight = descContent.scrollHeight;
-                const availableHeight = desc.clientHeight;
+                // Restore the full text — this may be a re-run over already-paginated cards
+                if (!originalDescHTML.has(descContent)) {
+                    originalDescHTML.set(descContent, descContent.innerHTML);
+                } else {
+                    descContent.innerHTML = originalDescHTML.get(descContent);
+                }
 
-                if (contentHeight <= availableHeight + 2) return;
+                if (desc.scrollHeight <= desc.clientHeight + 1) return;
+
+                // Content left to place, consumed page by page
+                const remaining = document.createElement('div');
+                remaining.innerHTML = originalDescHTML.get(descContent);
 
                 if (!splitMode) {
-                    // Truncate mode — show "see source" indicator
+                    // Truncate mode — trim to a whole word and point at the source book
                     const indicator = document.createElement('div');
                     indicator.className = 'see-source';
                     indicator.textContent = `...see ${source} for full text`;
@@ -2883,55 +2971,90 @@
                     } else {
                         body.appendChild(indicator);
                     }
+                    descContent.innerHTML = '';
+                    fillWithFittingContent(remaining, descContent,
+                        () => desc.scrollHeight <= desc.clientHeight);
                     return;
                 }
 
-                // Split mode — create continuation cards
-                // Continuation pages have slightly less space due to the "...continued" label
-                const contLabelHeight = 18;
-                const contPageHeight = Math.max(availableHeight - contLabelHeight, 50);
-                const totalPages = 1 + Math.ceil((contentHeight - availableHeight) / contPageHeight);
-
-                // Add page badge to original card
-                const titleRow = card.querySelector('.card-title-row');
+                // Split mode — divide the text across continuation cards.
+                // The page badge goes on before measuring (it can push the spell name
+                // onto a second line); it starts oversized so the real numbers, added
+                // once the page count is known, can only ever take up less room.
                 const badge = document.createElement('span');
                 badge.className = 'card-page-badge';
-                badge.textContent = `1/${totalPages}`;
-                titleRow.appendChild(badge);
+                badge.textContent = '00/00';
+                card.querySelector('.card-title-row').appendChild(badge);
 
-                // Create continuation cards
+                const template = card.cloneNode(true);
+                descContent.innerHTML = '';
+                fillWithFittingContent(remaining, descContent,
+                    () => desc.scrollHeight <= desc.clientHeight);
+
+                const pageCards = [card];
                 let insertAfter = card;
-                for (let page = 2; page <= totalPages; page++) {
-                    const contCard = card.cloneNode(true);
+                // Guard against a page too small to hold anything (would loop forever)
+                while (remaining.firstChild && pageCards.length < 30) {
+                    const contCard = template.cloneNode(true);
                     contCard.classList.add('continuation');
-
-                    // Update page badge
-                    const contBadge = contCard.querySelector('.card-page-badge');
-                    contBadge.textContent = `${page}/${totalPages}`;
 
                     const contBody = contCard.querySelector('.card-body');
                     const contDesc = contCard.querySelector('.card-description');
                     const contContent = contCard.querySelector('.desc-content');
 
-                    // Remove higher-levels on continuation cards
+                    // Higher-levels text belongs on the last card only; add it there afterwards
                     const contHigher = contCard.querySelector('.card-higher-levels');
                     if (contHigher) contHigher.remove();
 
-                    // Add continuation label to card-body BEFORE card-description
-                    // (not inside it, so overflow:hidden on card-description clips properly)
+                    // Label sits in card-body, outside the clipped description
                     const label = document.createElement('div');
                     label.className = 'continuation-label';
                     label.textContent = `...continued`;
                     contBody.insertBefore(label, contDesc);
 
-                    // Shift content: page 1 shows first availableHeight,
-                    // each continuation page shows contPageHeight worth of content
-                    const offset = availableHeight + contPageHeight * (page - 2);
-                    contContent.style.marginTop = `-${offset}px`;
-
+                    contContent.innerHTML = '';
                     insertAfter.after(contCard);
                     insertAfter = contCard;
+                    pageCards.push(contCard);
+
+                    fillWithFittingContent(remaining, contContent,
+                        () => contDesc.scrollHeight <= contDesc.clientHeight);
+
+                    if (!contContent.firstChild) {
+                        // Nothing fits at all — bail out rather than spawn empty cards
+                        contCard.remove();
+                        pageCards.pop();
+                        break;
+                    }
                 }
+
+                // "Higher Levels" stays on card 1, where the space for it was reserved
+                const lastCard = pageCards[pageCards.length - 1];
+
+                // If anything is still unplaced, say so instead of silently dropping it
+                if (remaining.firstChild && remaining.textContent.trim()) {
+                    const indicator = document.createElement('div');
+                    indicator.className = 'see-source';
+                    indicator.textContent = `...see ${source} for full text`;
+                    lastCard.querySelector('.card-body').appendChild(indicator);
+
+                    // The indicator eats into the space the text was fitted to — re-trim
+                    const lastDesc = lastCard.querySelector('.card-description');
+                    const lastContent = lastCard.querySelector('.desc-content');
+                    const overspill = document.createElement('div');
+                    while (lastContent.firstChild) overspill.appendChild(lastContent.firstChild);
+                    fillWithFittingContent(overspill, lastContent,
+                        () => lastDesc.scrollHeight <= lastDesc.clientHeight);
+                }
+
+                pageCards.forEach((pageCard, i) => {
+                    const pageBadge = pageCard.querySelector('.card-page-badge');
+                    if (pageCards.length > 1) {
+                        pageBadge.textContent = `${i + 1}/${pageCards.length}`;
+                    } else {
+                        pageBadge.remove();
+                    }
+                });
             });
         }
 
