@@ -189,9 +189,46 @@
             font-size: 14px;
         }
 
+        /* Tint the border on text fields, but never remove the focus ring —
+           `input` also covers checkboxes, ranges and color swatches, which have
+           no visible border to tint */
         select:focus, input:focus {
-            outline: none;
             border-color: #3498db;
+        }
+
+        :focus-visible {
+            outline: 2px solid #2b6cb0;
+            outline-offset: 2px;
+        }
+
+        /* Buttons that look like links (real buttons, for keyboard and SR semantics) */
+        .link-btn {
+            background: none;
+            border: none;
+            padding: 0;
+            font-size: 12px;
+            color: #1e6fb8;
+            text-decoration: underline;
+            cursor: pointer;
+            width: auto;
+        }
+
+        .link-btn:hover {
+            background: none;
+            color: #144e82;
+        }
+
+        /* Screen-reader-only text */
+        .sr-only {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            padding: 0;
+            margin: -1px;
+            overflow: hidden;
+            clip: rect(0, 0, 0, 0);
+            white-space: nowrap;
+            border: 0;
         }
 
         .level-checkboxes {
@@ -286,7 +323,7 @@
 
         .autocomplete-item .spell-meta {
             font-size: 12px;
-            color: #888;
+            color: #6b6b6b;
         }
 
         /* Selected spells list */
@@ -296,8 +333,9 @@
             padding-top: 20px;
         }
 
-        .selected-spells h3 {
+        .selected-spells h2 {
             margin: 0 0 10px;
+            font-size: 1.17em;
         }
 
         .spell-list {
@@ -332,7 +370,7 @@
             padding: 2px 6px;
             font-size: 12px;
             background: transparent;
-            color: #999;
+            color: #6b6b6b;
             border-radius: 50%;
         }
 
@@ -342,7 +380,7 @@
         }
 
         .empty-message {
-            color: #999;
+            color: #6b6b6b;
             font-style: italic;
         }
 
@@ -705,6 +743,14 @@
             text-align: center;
         }
 
+        /* The disclosure buttons are wrapped in headings for document structure;
+           the heading itself should not add any visual weight */
+        .panel-heading {
+            margin: 0;
+            font-size: inherit;
+            font-weight: inherit;
+        }
+
         .layout-form {
             display: none;
             margin-top: 15px;
@@ -714,12 +760,12 @@
             display: block;
         }
 
-        .layout-form h4 {
+        .layout-form h3 {
             margin: 0 0 8px;
             font-size: 13px;
             text-transform: uppercase;
             letter-spacing: 0.5px;
-            color: #888;
+            color: #6b6b6b;
         }
 
         .layout-section {
@@ -734,10 +780,17 @@
 
         .layout-slider {
             display: grid;
-            grid-template-columns: 110px 1fr 52px;
+            grid-template-columns: 110px 1fr 72px;
             align-items: center;
             gap: 8px;
             font-size: 13px;
+        }
+
+        .layout-slider label,
+        .layout-slider > label {
+            font-weight: normal;
+            margin: 0;
+            cursor: pointer;
         }
 
         .layout-slider input[type="range"] {
@@ -746,11 +799,36 @@
             cursor: pointer;
         }
 
-        .layout-slider .layout-value {
+        .layout-number-wrap {
+            display: flex;
+            align-items: baseline;
+            gap: 3px;
+        }
+
+        .layout-number {
+            /* Fits a 4-character value such as "12.5" alongside the spin buttons */
+            width: 53px;
+            /* Enough height that the spin buttons aren't clipped at the top */
+            height: 24px;
+            padding: 1px 2px 1px 5px;
             font-size: 12px;
-            color: #666;
-            text-align: right;
+            line-height: normal;
+            border: 1px solid #ddd;
+            border-radius: 3px;
             font-variant-numeric: tabular-nums;
+            box-sizing: border-box;
+        }
+
+        /* Keep the spin buttons visible rather than appearing only on hover, so the
+           space they occupy always reads as part of the control */
+        .layout-number::-webkit-inner-spin-button {
+            opacity: 1;
+            height: 22px;
+        }
+
+        .layout-unit {
+            font-size: 12px;
+            color: #6b6b6b;
         }
 
         .layout-checks {
@@ -828,13 +906,12 @@
         }
 
         .custom-spell-form textarea:focus {
-            outline: none;
             border-color: #3498db;
         }
 
         .custom-spell-form .hint {
             font-size: 12px;
-            color: #999;
+            color: #6b6b6b;
             margin-top: 2px;
         }
 
@@ -1038,7 +1115,7 @@
     <div class="ui-container">
         <h1>D&D 5e Spell Card Generator</h1>
 
-        <div id="status"></div>
+        <div id="status" role="status" aria-live="polite"></div>
 
         <div id="srdBanner" class="status info" style="display:none;">
             <span id="srdBannerText">
@@ -1130,8 +1207,10 @@
             <div class="control-group">
                 <label for="spellSearch">Add Individual Spell</label>
                 <div class="search-container">
-                    <input type="text" id="spellSearch" placeholder="Search spells...">
-                    <div class="autocomplete-list" id="autocomplete"></div>
+                    <input type="text" id="spellSearch" placeholder="Search spells..."
+                           role="combobox" aria-expanded="false" aria-controls="autocomplete"
+                           aria-autocomplete="list" autocomplete="off">
+                    <div class="autocomplete-list" id="autocomplete" role="listbox" aria-label="Spell search results"></div>
                 </div>
             </div>
 
@@ -1169,7 +1248,7 @@
                     <option value="greyscale">Greyscale</option>
                     <option value="bw">Black & White</option>
                 </select>
-                <a href="#" id="customizeClassColors" style="font-size:12px; color:#3498db; display:none;">Customize colors...</a>
+                <button type="button" id="customizeClassColors" class="link-btn" style="display:none;">Customize colors...</button>
                 <label id="monoColorWrap" style="display:none; align-items:center; gap:6px; font-size:12px; font-weight:normal; margin-top:4px; cursor:pointer;">
                     <input type="color" id="monoColor" style="width:32px; height:24px; border:1px solid #ccc; border-radius:3px; padding:0; cursor:pointer;">
                     Card color
@@ -1253,7 +1332,7 @@
                     <div style="margin:4px 0;">
                         <label for="backOrnamentSize">Ornament size:</label>
                         <input type="number" id="backOrnamentSize" value="45" min="8" max="72" step="2" style="font-size:13px; width:50px; padding:2px 4px;">
-                        <span style="color:#999;">pt</span>
+                        <span style="color:#6b6b6b;">pt</span>
                     </div>
                     <div style="margin:4px 0;">
                         <label for="backFlip">Flip edge:</label>
@@ -1265,14 +1344,14 @@
                     <div style="margin:4px 0;">
                         <label for="backOffset">Alignment offset:</label>
                         <input type="number" id="backOffset" value="0" min="-20" max="20" step="0.5" style="font-size:13px; width:55px; padding:2px 4px;">
-                        <span style="color:#999;">mm (+ shifts backs right)</span>
+                        <span style="color:#6b6b6b;">mm (+ shifts backs right)</span>
                     </div>
                     <div style="margin:8px 0 4px;">
-                        <label style="font-size:12px; color:#888;">Preview:</label>
+                        <label style="font-size:12px; color:#6b6b6b;">Preview:</label>
                         <div id="backPreview" style="margin-top:4px; display:flex; justify-content:center;"></div>
                     </div>
                 </div>
-                <a href="#" id="toggleBackOptions" style="display:none; font-size:12px; color:#3498db; margin-top:4px;">Hide Back Options</a>
+                <button type="button" id="toggleBackOptions" class="link-btn" style="display:none; margin-top:4px;" aria-expanded="true" aria-controls="cardBackOptions">Hide Back Options</button>
             </div>
         </div>
 
@@ -1294,40 +1373,59 @@
         </div>
 
         <div class="layout-panel">
-            <button class="toggle-btn" id="toggleLayout">Card Layout Options</button>
+            <h2 class="panel-heading">
+                <button class="toggle-btn" id="toggleLayout" aria-expanded="false" aria-controls="layoutForm">Card Layout Options</button>
+            </h2>
             <div class="layout-form" id="layoutForm">
                 <div class="layout-section">
-                    <h4>Header</h4>
+                    <h3>Header</h3>
                     <div class="layout-sliders">
-                        <label class="layout-slider">Spell name
-                            <input type="range" data-layout="fontName" min="6" max="20" step="0.5">
-                            <span class="layout-value"></span>
-                        </label>
-                        <label class="layout-slider">Level circle
-                            <input type="range" data-layout="levelSize" min="12" max="48" step="1">
-                            <span class="layout-value"></span>
-                        </label>
-                        <label class="layout-slider">School line
-                            <input type="range" data-layout="fontSchool" min="5" max="14" step="0.5">
-                            <span class="layout-value"></span>
-                        </label>
+                        <div class="layout-slider">
+                            <label for="ls-fontName">Spell name</label>
+                            <input type="range" id="ls-fontName" data-layout="fontName" min="6" max="20" step="0.5">
+                            <span class="layout-number-wrap">
+                                <input type="number" class="layout-number" data-layout="fontName" min="6" max="20" step="0.5" aria-label="Spell name, points">
+                                <span class="layout-unit" aria-hidden="true">pt</span>
+                            </span>
+                        </div>
+                        <div class="layout-slider">
+                            <label for="ls-levelSize">Level circle</label>
+                            <input type="range" id="ls-levelSize" data-layout="levelSize" min="12" max="48" step="1">
+                            <span class="layout-number-wrap">
+                                <input type="number" class="layout-number" data-layout="levelSize" min="12" max="48" step="1" aria-label="Level circle, pixels">
+                                <span class="layout-unit" aria-hidden="true">px</span>
+                            </span>
+                        </div>
+                        <div class="layout-slider">
+                            <label for="ls-fontSchool">School line</label>
+                            <input type="range" id="ls-fontSchool" data-layout="fontSchool" min="5" max="14" step="0.5">
+                            <span class="layout-number-wrap">
+                                <input type="number" class="layout-number" data-layout="fontSchool" min="5" max="14" step="0.5" aria-label="School line, points">
+                                <span class="layout-unit" aria-hidden="true">pt</span>
+                            </span>
+                        </div>
                     </div>
                 </div>
 
                 <div class="layout-section">
-                    <h4>Ritual &amp; concentration tags</h4>
+                    <h3>Ritual &amp; concentration tags</h3>
                     <div class="layout-sliders">
-                        <label class="layout-slider">Position
-                            <select data-layout="tagPosition" style="grid-column:2 / span 2; font-size:13px; padding:2px 4px;">
+                        <div class="layout-slider">
+                            <label for="ls-tagPosition">Position</label>
+                            <select id="ls-tagPosition" data-layout="tagPosition" style="grid-column:2 / span 2; font-size:13px; padding:2px 4px;">
                                 <option value="own">On their own line</option>
                                 <option value="inline">Beside the school</option>
                                 <option value="right">Right of the school line</option>
                             </select>
-                        </label>
-                        <label class="layout-slider">Tag text
-                            <input type="range" data-layout="fontBadge" min="5" max="12" step="0.5">
-                            <span class="layout-value"></span>
-                        </label>
+                        </div>
+                        <div class="layout-slider">
+                            <label for="ls-fontBadge">Tag text</label>
+                            <input type="range" id="ls-fontBadge" data-layout="fontBadge" min="5" max="12" step="0.5">
+                            <span class="layout-number-wrap">
+                                <input type="number" class="layout-number" data-layout="fontBadge" min="5" max="12" step="0.5" aria-label="Tag text, points">
+                                <span class="layout-unit" aria-hidden="true">pt</span>
+                            </span>
+                        </div>
                     </div>
                     <div class="layout-colors" style="margin-top:10px;">
                         <label><input type="color" data-layout="ritualColor"> Ritual</label>
@@ -1336,34 +1434,54 @@
                 </div>
 
                 <div class="layout-section">
-                    <h4>Body text</h4>
+                    <h3>Body text</h3>
                     <div class="layout-sliders">
-                        <label class="layout-slider">Stats
-                            <input type="range" data-layout="fontStats" min="5" max="14" step="0.5">
-                            <span class="layout-value"></span>
-                        </label>
-                        <label class="layout-slider">Description
-                            <input type="range" data-layout="fontDesc" min="5" max="14" step="0.5">
-                            <span class="layout-value"></span>
-                        </label>
-                        <label class="layout-slider">Higher levels
-                            <input type="range" data-layout="fontHigher" min="5" max="14" step="0.5">
-                            <span class="layout-value"></span>
-                        </label>
-                        <label class="layout-slider">Line spacing
-                            <input type="range" data-layout="lineHeight" min="1" max="2" step="0.05">
-                            <span class="layout-value"></span>
-                        </label>
+                        <div class="layout-slider">
+                            <label for="ls-fontStats">Stats</label>
+                            <input type="range" id="ls-fontStats" data-layout="fontStats" min="5" max="14" step="0.5">
+                            <span class="layout-number-wrap">
+                                <input type="number" class="layout-number" data-layout="fontStats" min="5" max="14" step="0.5" aria-label="Stats, points">
+                                <span class="layout-unit" aria-hidden="true">pt</span>
+                            </span>
+                        </div>
+                        <div class="layout-slider">
+                            <label for="ls-fontDesc">Description</label>
+                            <input type="range" id="ls-fontDesc" data-layout="fontDesc" min="5" max="14" step="0.5">
+                            <span class="layout-number-wrap">
+                                <input type="number" class="layout-number" data-layout="fontDesc" min="5" max="14" step="0.5" aria-label="Description, points">
+                                <span class="layout-unit" aria-hidden="true">pt</span>
+                            </span>
+                        </div>
+                        <div class="layout-slider">
+                            <label for="ls-fontHigher">Higher levels</label>
+                            <input type="range" id="ls-fontHigher" data-layout="fontHigher" min="5" max="14" step="0.5">
+                            <span class="layout-number-wrap">
+                                <input type="number" class="layout-number" data-layout="fontHigher" min="5" max="14" step="0.5" aria-label="Higher levels, points">
+                                <span class="layout-unit" aria-hidden="true">pt</span>
+                            </span>
+                        </div>
+                        <div class="layout-slider">
+                            <label for="ls-lineHeight">Line spacing</label>
+                            <input type="range" id="ls-lineHeight" data-layout="lineHeight" min="1" max="2" step="0.05">
+                            <span class="layout-number-wrap">
+                                <input type="number" class="layout-number" data-layout="lineHeight" min="1" max="2" step="0.05" aria-label="Line spacing, ratio">
+                                
+                            </span>
+                        </div>
                     </div>
                 </div>
 
                 <div class="layout-section">
-                    <h4>Footer</h4>
+                    <h3>Footer</h3>
                     <div class="layout-sliders">
-                        <label class="layout-slider">Footer text
-                            <input type="range" data-layout="fontFooter" min="5" max="14" step="0.5">
-                            <span class="layout-value"></span>
-                        </label>
+                        <div class="layout-slider">
+                            <label for="ls-fontFooter">Footer text</label>
+                            <input type="range" id="ls-fontFooter" data-layout="fontFooter" min="5" max="14" step="0.5">
+                            <span class="layout-number-wrap">
+                                <input type="number" class="layout-number" data-layout="fontFooter" min="5" max="14" step="0.5" aria-label="Footer text, points">
+                                <span class="layout-unit" aria-hidden="true">pt</span>
+                            </span>
+                        </div>
                     </div>
                     <div class="layout-checks" style="margin-top:10px;">
                         <label><input type="checkbox" data-layout="showClasses"> Show classes</label>
@@ -1377,7 +1495,9 @@
         </div>
 
         <div class="custom-spell-panel">
-            <button class="toggle-btn" id="toggleCustomSpell">Create Custom Spell</button>
+            <h2 class="panel-heading">
+                <button class="toggle-btn" id="toggleCustomSpell" aria-expanded="false" aria-controls="customSpellForm">Create Custom Spell</button>
+            </h2>
             <div class="custom-spell-form" id="customSpellForm">
                 <div class="form-grid">
                     <div class="control-group">
@@ -1467,7 +1587,7 @@
         </div>
 
         <div class="selected-spells">
-            <h3>Selected Spells (<span id="spellCount">0</span>)</h3>
+            <h2>Selected Spells (<span id="spellCount">0</span>)</h2>
             <div class="spell-list" id="selectedSpellsList">
                 <span class="empty-message">No spells selected. Use the controls above to add spells.</span>
             </div>
@@ -1478,7 +1598,7 @@
         <!-- Cards will be generated here -->
     </div>
 
-    <footer class="ui-container" style="text-align:center; font-size:13px; color:#888; margin-top:20px;">
+    <footer class="ui-container" style="text-align:center; font-size:13px; color:#6b6b6b; margin-top:20px;">
         <p style="margin:0 0 8px;">
             Find this useful?
             <a href="https://ko-fi.com/mugasofer" target="_blank" style="font-weight:600; color:#FF5E5B; text-decoration:none;">Support me on Ko-fi</a>
@@ -1493,8 +1613,8 @@
 
     <!-- Class Color Customization Modal -->
     <div id="colorModal" style="display:none; position:fixed; inset:0; z-index:1000; background:rgba(0,0,0,0.5); align-items:center; justify-content:center;">
-        <div style="background:white; border-radius:8px; padding:24px; max-width:360px; width:90%; box-shadow:0 4px 20px rgba(0,0,0,0.3);">
-            <h3 style="margin:0 0 16px; color:#333;">Class Colors</h3>
+        <div role="dialog" aria-modal="true" aria-labelledby="colorModalTitle" style="background:white; border-radius:8px; padding:24px; max-width:360px; width:90%; box-shadow:0 4px 20px rgba(0,0,0,0.3);">
+            <h2 id="colorModalTitle" style="margin:0 0 16px; color:#333; font-size:20px;">Class Colors</h2>
             <div id="colorPickerGrid" style="display:grid; grid-template-columns:1fr 1fr; gap:10px 20px;"></div>
             <div style="margin-top:16px; display:flex; gap:10px; justify-content:space-between;">
                 <button id="resetClassColors" class="secondary" style="font-size:13px;">Reset to defaults</button>
@@ -1932,11 +2052,11 @@
             }
             updateBackPreview();
         });
-        toggleBackOptions.addEventListener('click', (e) => {
-            e.preventDefault();
+        toggleBackOptions.addEventListener('click', () => {
             backOptionsCollapsed = !backOptionsCollapsed;
             cardBackOptions.style.display = backOptionsCollapsed ? 'none' : 'block';
             toggleBackOptions.textContent = backOptionsCollapsed ? 'Show Back Options' : 'Hide Back Options';
+            toggleBackOptions.setAttribute('aria-expanded', String(!backOptionsCollapsed));
         });
         backOrnament.addEventListener('change', () => {
             const isCustom = backOrnament.value === 'custom';
@@ -1988,18 +2108,48 @@
             `).join('');
         }
 
-        customizeLink.addEventListener('click', (e) => {
-            e.preventDefault();
-            populateColorPickers();
-            colorModal.style.display = 'flex';
-        });
+        customizeLink.addEventListener('click', () => openColorModal());
 
-        document.getElementById('closeColorModal').addEventListener('click', () => {
+        // Modal focus handling: move focus in on open, restore it on close, and
+        // keep Tab inside the dialog while it is open
+        let colorModalReturnFocus = null;
+
+        function openColorModal() {
+            populateColorPickers();
+            colorModalReturnFocus = document.activeElement;
+            colorModal.style.display = 'flex';
+            const first = colorModal.querySelector('input, button');
+            if (first) first.focus();
+        }
+
+        function closeColorModal() {
             colorModal.style.display = 'none';
-        });
+            if (colorModalReturnFocus) colorModalReturnFocus.focus();
+            colorModalReturnFocus = null;
+        }
+
+        document.getElementById('closeColorModal').addEventListener('click', closeColorModal);
 
         colorModal.addEventListener('click', (e) => {
-            if (e.target === colorModal) colorModal.style.display = 'none';
+            if (e.target === colorModal) closeColorModal();
+        });
+
+        colorModal.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                closeColorModal();
+                return;
+            }
+            if (e.key !== 'Tab') return;
+            const focusable = [...colorModal.querySelectorAll('input, button')].filter(el => el.offsetParent !== null);
+            if (!focusable.length) return;
+            const first = focusable[0], last = focusable[focusable.length - 1];
+            if (e.shiftKey && document.activeElement === first) {
+                e.preventDefault();
+                last.focus();
+            } else if (!e.shiftKey && document.activeElement === last) {
+                e.preventDefault();
+                first.focus();
+            }
         });
 
         colorPickerGrid.addEventListener('input', (e) => {
@@ -2057,13 +2207,18 @@
 
         function syncLayoutControls() {
             layoutForm.querySelectorAll('[data-layout]').forEach(input => {
+                // Never write back into the control being edited: it would erase a
+                // half-typed value, so "7." could never become "7.5"
+                if (input === document.activeElement) return;
                 const key = input.dataset.layout;
-                if (input.type === 'range') {
+                if (input.type === 'range' || input.type === 'number') {
                     const value = effectiveSize(key);
                     input.value = value;
-                    const unit = layoutSizeVars[key][1];
-                    input.parentElement.querySelector('.layout-value').textContent =
-                        (unit === '' ? value.toFixed(2) : value + unit);
+                    if (input.type === 'range') {
+                        // Without this a screen reader reads a bare number with no unit
+                        const unit = layoutSizeVars[key][1];
+                        input.setAttribute('aria-valuetext', unit === '' ? value.toFixed(2) : value + unit);
+                    }
                 } else if (input.type === 'checkbox') {
                     input.checked = layout[key];
                 } else {
@@ -2087,9 +2242,11 @@
             applyLayout();
         }
 
-        document.getElementById('toggleLayout').addEventListener('click', () => {
+        document.getElementById('toggleLayout').addEventListener('click', (e) => {
             layoutForm.classList.toggle('active');
-            if (layoutForm.classList.contains('active')) syncLayoutControls();
+            const open = layoutForm.classList.contains('active');
+            e.currentTarget.setAttribute('aria-expanded', String(open));
+            if (open) syncLayoutControls();
         });
 
         layoutForm.addEventListener('input', (e) => {
@@ -2097,8 +2254,14 @@
             if (!input) return;
             const key = input.dataset.layout;
 
-            if (input.type === 'range') {
-                layout.sizes[key] = parseFloat(input.value);
+            if (input.type === 'range' || input.type === 'number') {
+                const value = parseFloat(input.value);
+                // Half-typed or out-of-range entries are ignored until they resolve,
+                // so the cards don't jump around while someone is still typing
+                if (Number.isNaN(value)) return;
+                const min = parseFloat(input.min), max = parseFloat(input.max);
+                if (value < min || value > max) return;
+                layout.sizes[key] = value;
             } else if (input.type === 'checkbox') {
                 layout[key] = input.checked;
             } else {
@@ -2106,6 +2269,29 @@
             }
             saveLayout();
             applyLayout();
+        });
+
+        // On commit, pull anything out of range back to the nearest valid value
+        layoutForm.addEventListener('change', (e) => {
+            const input = e.target.closest('input[type="number"][data-layout]');
+            if (!input) return;
+            const key = input.dataset.layout;
+            const min = parseFloat(input.min), max = parseFloat(input.max);
+            const value = parseFloat(input.value);
+
+            if (Number.isNaN(value)) {
+                input.blur();
+                syncLayoutControls();
+                return;
+            }
+            // Clamp, then snap to the slider's step so the two can't disagree
+            const step = parseFloat(input.step) || 1;
+            const clamped = Math.min(Math.max(value, min), max);
+            const snapped = Math.round((clamped - min) / step) * step + min;
+            layout.sizes[key] = parseFloat(snapped.toFixed(2));
+            saveLayout();
+            applyLayout();
+            input.value = layout.sizes[key];
         });
 
         monoColorInput.addEventListener('input', () => {
@@ -2128,8 +2314,12 @@
         // Show status message
         function showStatus(message, type = 'info') {
             status.className = `status ${type}`;
-            status.textContent = message;
+            // Errors interrupt; everything else waits its turn
+            status.setAttribute('aria-live', type === 'error' ? 'assertive' : 'polite');
+            // Make it visible before setting the text — a live region whose content
+            // changes while hidden is not announced
             status.style.display = 'block';
+            status.textContent = message;
             if (type === 'success') {
                 setTimeout(() => status.style.display = 'none', 3000);
             }
@@ -2840,10 +3030,27 @@
         // Spell search autocomplete
         let selectedIndex = -1;
 
+        // Keeps the combobox state the screen reader sees in step with the list
+        function closeAutocomplete() {
+            autocomplete.classList.remove('active');
+            spellSearch.setAttribute('aria-expanded', 'false');
+            spellSearch.removeAttribute('aria-activedescendant');
+            selectedIndex = -1;
+        }
+
+        function highlightAutocompleteItem(items, index) {
+            items.forEach((item, i) => {
+                const on = i === index;
+                item.classList.toggle('selected', on);
+                item.setAttribute('aria-selected', String(on));
+                if (on) spellSearch.setAttribute('aria-activedescendant', item.id);
+            });
+        }
+
         spellSearch.addEventListener('input', () => {
             const query = spellSearch.value.toLowerCase().trim();
             if (query.length < 2) {
-                autocomplete.classList.remove('active');
+                closeAutocomplete();
                 return;
             }
 
@@ -2853,12 +3060,12 @@
                 .slice(0, 10);
 
             if (matches.length === 0) {
-                autocomplete.classList.remove('active');
+                closeAutocomplete();
                 return;
             }
 
             autocomplete.innerHTML = matches.map((spell, i) => `
-                <div class="autocomplete-item" data-name="${spell.name}">
+                <div class="autocomplete-item" role="option" id="autocomplete-item-${i}" aria-selected="false" data-name="${spell.name}">
                     <div>${spell.name}</div>
                     <div class="spell-meta">
                         ${spell.level === 0 ? 'Cantrip' : `Level ${spell.level}`}
@@ -2868,6 +3075,8 @@
             `).join('');
 
             autocomplete.classList.add('active');
+            spellSearch.setAttribute('aria-expanded', 'true');
+            spellSearch.removeAttribute('aria-activedescendant');
             selectedIndex = -1;
         });
 
@@ -2878,18 +3087,18 @@
             if (e.key === 'ArrowDown') {
                 e.preventDefault();
                 selectedIndex = Math.min(selectedIndex + 1, items.length - 1);
-                items.forEach((item, i) => item.classList.toggle('selected', i === selectedIndex));
+                highlightAutocompleteItem(items, selectedIndex);
             } else if (e.key === 'ArrowUp') {
                 e.preventDefault();
                 selectedIndex = Math.max(selectedIndex - 1, 0);
-                items.forEach((item, i) => item.classList.toggle('selected', i === selectedIndex));
+                highlightAutocompleteItem(items, selectedIndex);
             } else if (e.key === 'Enter' && selectedIndex >= 0) {
                 e.preventDefault();
                 addSpell(items[selectedIndex].dataset.name);
                 spellSearch.value = '';
-                autocomplete.classList.remove('active');
+                closeAutocomplete();
             } else if (e.key === 'Escape') {
-                autocomplete.classList.remove('active');
+                closeAutocomplete();
             }
         });
 
@@ -2898,14 +3107,19 @@
             if (item) {
                 addSpell(item.dataset.name);
                 spellSearch.value = '';
-                autocomplete.classList.remove('active');
+                closeAutocomplete();
             }
         });
 
         document.addEventListener('click', (e) => {
             if (!e.target.closest('.search-container')) {
-                autocomplete.classList.remove('active');
+                closeAutocomplete();
             }
+        });
+
+        selectedSpellsList.addEventListener('click', (e) => {
+            const btn = e.target.closest('[data-remove-spell]');
+            if (btn) removeSpell(btn.dataset.removeSpell);
         });
 
         // Add/remove spells
@@ -2935,13 +3149,27 @@
                 .filter(Boolean)
                 .sort((a, b) => a.level - b.level || a.name.localeCompare(b.name));
 
-            selectedSpellsList.innerHTML = sorted.map(spell => `
-                <span class="spell-tag">
-                    <span class="level-badge">${spell.level === 0 ? 'C' : spell.level}</span>
-                    ${spell.name}
-                    <button onclick="removeSpell('${spell.name.replace(/'/g, "\\'")}')">&times;</button>
-                </span>
-            `).join('');
+            // Names go in via textContent and the handler is delegated, so quotes
+            // and angle brackets in custom spell names can't break the markup
+            selectedSpellsList.innerHTML = '';
+            sorted.forEach(spell => {
+                const tag = document.createElement('span');
+                tag.className = 'spell-tag';
+
+                const badge = document.createElement('span');
+                badge.className = 'level-badge';
+                badge.textContent = spell.level === 0 ? 'C' : spell.level;
+                badge.setAttribute('aria-label', spell.level === 0 ? 'Cantrip' : `Level ${spell.level}`);
+
+                const remove = document.createElement('button');
+                remove.type = 'button';
+                remove.dataset.removeSpell = spell.name;
+                remove.setAttribute('aria-label', `Remove ${spell.name}`);
+                remove.textContent = '×';
+
+                tag.append(badge, ` ${spell.name} `, remove);
+                selectedSpellsList.appendChild(tag);
+            });
 
             generateCards();
         }
@@ -3463,12 +3691,14 @@
         // ===== CUSTOM SPELL ENTRY =====
         const customSpellForm = document.getElementById('customSpellForm');
 
-        document.getElementById('toggleCustomSpell').addEventListener('click', () => {
+        document.getElementById('toggleCustomSpell').addEventListener('click', (e) => {
             customSpellForm.classList.toggle('active');
+            e.currentTarget.setAttribute('aria-expanded', String(customSpellForm.classList.contains('active')));
         });
 
         document.getElementById('cancelCustomSpell').addEventListener('click', () => {
             customSpellForm.classList.remove('active');
+            document.getElementById('toggleCustomSpell').setAttribute('aria-expanded', 'false');
         });
 
         // Load saved custom spells on startup
