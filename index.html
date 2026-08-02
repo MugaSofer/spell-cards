@@ -1705,12 +1705,6 @@
             Druid: '#4caf50', Paladin: '#ffb300', Ranger: '#66bb6a',
             Sorcerer: '#e74c3c', Warlock: '#9c27b0', Wizard: '#3498db'
         };
-        let classColors = Object.assign({}, defaultClassColors);
-        try {
-            const saved = JSON.parse(localStorage.getItem('classColors'));
-            if (saved) Object.assign(classColors, saved);
-        } catch (e) { console.warn('Saved class colours could not be read; using defaults:', e); }
-
         // School and level palettes are read back out of the stylesheet, so the CSS
         // stays the one place the default colours are written down
         const SCHOOLS = ['Abjuration', 'Conjuration', 'Divination', 'Enchantment',
@@ -1744,6 +1738,9 @@
             return colors;
         }
 
+        // All three palettes load the same way: unknown keys and anything that
+        // isn't a hex colour are dropped, since these feed CSS variables directly
+        let classColors = loadPalette('classColors', defaultClassColors);
         let schoolColors = loadPalette('schoolColors', defaultSchoolColors);
         let levelColors = loadPalette('levelColors', defaultLevelColors);
 
