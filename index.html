@@ -1133,6 +1133,7 @@
         .png-export.png-border .spell-card .card-stats { border-bottom-color: var(--png-border) !important; }
         .png-export.png-border .spell-card .card-higher-levels,
         .png-export.png-border .spell-card .card-footer { border-top-color: var(--png-border) !important; }
+        .cards-container.png-export.png-noborder .spell-card { border-color: transparent !important; }
         .png-export.png-border.png-bg .spell-card .card-level { color: var(--png-bg) !important; }
         /* Rounded border inset 1/16" from the trim edge so it stays inside the rounded
            trim masks print tools apply; the card shrinks by the same amount the bleed grows,
@@ -1395,6 +1396,7 @@
             <label><input type="checkbox" id="pngBgOn"> Background <input type="color" id="pngBg" value="#ffffff"></label>
             <label><input type="checkbox" id="pngTextOn"> Text <input type="color" id="pngText" value="#222222"></label>
             <label><input type="checkbox" id="pngBorderOn"> Border <input type="color" id="pngBorder" value="#333333"></label>
+            <label><input type="checkbox" id="pngNoBorder"> No outer border</label>
             <button id="exportPngs">Download PNGs</button>
             <span id="pngStatus" style="font-size:12px; color:#6b6b6b;"></span>
         </div>
@@ -1798,6 +1800,7 @@
                     cardsContainer.classList.toggle(`png-${lower}`, on);
                     if (on) cardsContainer.style.setProperty(`--png-${lower}`, document.getElementById(`png${key}`).value);
                 }
+                cardsContainer.classList.toggle('png-noborder', document.getElementById('pngNoBorder').checked);
             }
 
             // Apply color mode
