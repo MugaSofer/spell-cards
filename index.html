@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>D&D 5e Spell Card Generator</title>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/html-to-image@1.11.11/dist/html-to-image.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Alegreya:ital,wght@0,400;0,700;1,400;1,700&family=Alice&family=Almendra:ital,wght@0,400;0,700;1,400;1,700&family=Caudex:ital,wght@0,400;0,700;1,400;1,700&family=Cinzel:wght@400;700&family=Danfo&family=Grenze:ital,wght@0,400;0,700;1,400;1,700&family=Grenze+Gotisch:wght@400;700&family=Inknut+Antiqua:wght@400;700&family=MedievalSharp&family=Merriweather:ital,wght@0,400;0,700;1,400;1,700&family=Orbitron:wght@400;700&family=PT+Serif:ital,wght@0,400;0,700;1,400;1,700&family=Pirata+One&family=Texturina:ital,wght@0,400;0,700;1,400;1,700&family=Uncial+Antiqua&family=Vollkorn:ital,wght@0,400;0,700;1,400;1,700&family=Yusei+Magic&family=Zeyada&display=swap" rel="stylesheet">
@@ -1115,6 +1117,32 @@
             vertical-align: middle;
             margin-right: 6px;
         }
+        /* ===== PNG EXPORT ===== */
+        /* Safe area: 1/8" inside the trim edge plus clearance, so text and the level badge
+           stay clear of print tools' safe-area guides. The 1/8" bleed sits outside the card. */
+        .cards-container.png-export .spell-card { padding: max(var(--card-padding), 0.17in); }
+        .png-bleed .spell-card { box-shadow: none; }
+        .png-export.png-bg .spell-card { background: var(--png-bg) !important; }
+        .png-export.png-text .spell-card,
+        .png-export.png-text .spell-card .card-school,
+        .png-export.png-text .spell-card .card-footer,
+        .png-export.png-text .spell-card .see-source { color: var(--png-text) !important; }
+        .png-export.png-border .spell-card { border-color: var(--png-border) !important; }
+        .png-export.png-border .spell-card .card-level { background: var(--png-border) !important; }
+        .png-export.png-border .spell-card .card-header,
+        .png-export.png-border .spell-card .card-stats { border-bottom-color: var(--png-border) !important; }
+        .png-export.png-border .spell-card .card-higher-levels,
+        .png-export.png-border .spell-card .card-footer { border-top-color: var(--png-border) !important; }
+        .png-export.png-border.png-bg .spell-card .card-level { color: var(--png-bg) !important; }
+        /* Rounded border inset 1/16" from the trim edge so it stays inside the rounded
+           trim masks print tools apply; the card shrinks by the same amount the bleed grows,
+           keeping the image size exact */
+        .png-bleed { display: block; padding: calc(0.125in + 0.0625in); }
+        .cards-container.png-export .spell-card {
+            width: calc(var(--card-width) - 0.125in);
+            height: calc(var(--card-height) - 0.125in);
+            flex-shrink: 0;
+        }
     </style>
 </head>
 <body>
@@ -1360,6 +1388,15 @@
                 </div>
                 <button type="button" id="toggleBackOptions" class="link-btn" style="display:none; margin-top:4px;" aria-expanded="true" aria-controls="cardBackOptions">Hide Back Options</button>
             </div>
+        </div>
+
+        <div class="button-row" style="align-items:center; flex-wrap:wrap; gap:12px;">
+            <strong>PNG export (800 DPI, 1/8" bleed, 1/8" safe margin):</strong>
+            <label><input type="checkbox" id="pngBgOn"> Background <input type="color" id="pngBg" value="#ffffff"></label>
+            <label><input type="checkbox" id="pngTextOn"> Text <input type="color" id="pngText" value="#222222"></label>
+            <label><input type="checkbox" id="pngBorderOn"> Border <input type="color" id="pngBorder" value="#333333"></label>
+            <button id="exportPngs">Download PNGs</button>
+            <span id="pngStatus" style="font-size:12px; color:#6b6b6b;"></span>
         </div>
 
         <div class="button-row">
@@ -1746,11 +1783,22 @@
 
         // Apply card size, font size, and color mode classes
         let stylePassPending = false;
+        let pngExportMode = false;
 
         function updateCardStyles() {
             cardsContainer.className = 'cards-container';
             cardsContainer.classList.add(`size-${cardSizeSelect.value}`);
             cardsContainer.classList.add(`font-${fontSizeSelect.value}`);
+
+            if (pngExportMode) {
+                cardsContainer.classList.add('png-export');
+                for (const key of ['Bg', 'Text', 'Border']) {
+                    const lower = key.toLowerCase();
+                    const on = document.getElementById(`png${key}On`).checked;
+                    cardsContainer.classList.toggle(`png-${lower}`, on);
+                    if (on) cardsContainer.style.setProperty(`--png-${lower}`, document.getElementById(`png${key}`).value);
+                }
+            }
 
             // Apply color mode
             const colorMode = colorModeSelect.value;
@@ -4020,6 +4068,127 @@
                 });
             });
         });
+
+        // ===== PNG EXPORT =====
+        const PNG_DPI = 800;
+        const CSS_DPI = 96;
+        const BLEED_IN = 0.125;
+
+        const crcTable = Array.from({ length: 256 }, (_, n) => {
+            let c = n;
+            for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1;
+            return c >>> 0;
+        });
+        function crc32(bytes) {
+            let c = 0xFFFFFFFF;
+            for (const b of bytes) c = crcTable[(c ^ b) & 0xFF] ^ (c >>> 8);
+            return (c ^ 0xFFFFFFFF) >>> 0;
+        }
+
+        // Insert a pHYs chunk after IHDR so print software reads the PNG as 800 DPI
+        function setPngDpi(bytes, dpi) {
+            const ppm = Math.round(dpi / 0.0254);
+            const chunk = new Uint8Array(21);
+            const view = new DataView(chunk.buffer);
+            view.setUint32(0, 9);
+            chunk.set([0x70, 0x48, 0x59, 0x73], 4);
+            view.setUint32(8, ppm);
+            view.setUint32(12, ppm);
+            chunk[16] = 1;
+            view.setUint32(17, crc32(chunk.subarray(4, 17)));
+            const ihdrEnd = 8 + 25;
+            const out = new Uint8Array(bytes.length + chunk.length);
+            out.set(bytes.subarray(0, ihdrEnd), 0);
+            out.set(chunk, ihdrEnd);
+            out.set(bytes.subarray(ihdrEnd), ihdrEnd + chunk.length);
+            return out;
+        }
+
+        function downloadBlob(blob, filename) {
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            setTimeout(() => URL.revokeObjectURL(url), 1000);
+        }
+
+        const nextFrame = () => new Promise(r => requestAnimationFrame(() => r()));
+
+        async function exportPngs() {
+            const status = document.getElementById('pngStatus');
+            const button = document.getElementById('exportPngs');
+            if (selectedSpells.size === 0) {
+                status.textContent = 'Select some spells first.';
+                return;
+            }
+            if (!window.htmlToImage) {
+                status.textContent = 'Image library failed to load (check your connection).';
+                return;
+            }
+            button.disabled = true;
+            const host = document.createElement('div');
+            try {
+                // Regenerate in export mode so pagination is fitted to the safe margin
+                pngExportMode = true;
+                generateCards();
+                await document.fonts.ready;
+                await nextFrame();
+                await nextFrame();
+
+                const cards = Array.from(cardsContainer.querySelectorAll('.spell-card'));
+                host.className = cardsContainer.className;
+                host.style.cssText = cardsContainer.style.cssText;
+                host.style.position = 'fixed';
+                host.style.left = '-100000px';
+                host.style.top = '0';
+                document.body.appendChild(host);
+
+                const pixelRatio = PNG_DPI / CSS_DPI;
+                const bgOn = document.getElementById('pngBgOn').checked;
+                const bleedColor = bgOn ? document.getElementById('pngBg').value : '#ffffff';
+                const files = [];
+                let fontEmbedCSS;
+
+                for (let i = 0; i < cards.length; i++) {
+                    status.textContent = `Rendering ${i + 1} of ${cards.length}…`;
+                    const bleed = document.createElement('div');
+                    bleed.className = 'png-bleed';
+                    bleed.style.background = bleedColor;
+                    bleed.appendChild(cards[i].cloneNode(true));
+                    host.replaceChildren(bleed);
+                    if (fontEmbedCSS === undefined) fontEmbedCSS = await htmlToImage.getFontEmbedCSS(bleed);
+
+                    const canvas = await htmlToImage.toCanvas(bleed, { pixelRatio, fontEmbedCSS, cacheBust: false });
+                    const blob = await new Promise(r => canvas.toBlob(r, 'image/png'));
+                    const bytes = setPngDpi(new Uint8Array(await blob.arrayBuffer()), PNG_DPI);
+                    const name = cards[i].querySelector('.card-name')?.textContent.trim() || `card-${i + 1}`;
+                    const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'card';
+                    files.push({ name: `${String(i + 1).padStart(3, '0')}-${slug}.png`, bytes });
+                }
+
+                if (files.length === 1) {
+                    downloadBlob(new Blob([files[0].bytes], { type: 'image/png' }), files[0].name);
+                } else {
+                    status.textContent = 'Zipping…';
+                    const zip = new JSZip();
+                    files.forEach(f => zip.file(f.name, f.bytes));
+                    downloadBlob(await zip.generateAsync({ type: 'blob', compression: 'STORE' }), 'spell-cards-png.zip');
+                }
+                status.textContent = `Exported ${files.length} PNG${files.length === 1 ? '' : 's'}.`;
+            } catch (err) {
+                console.error('PNG export failed', err);
+                status.textContent = 'Export failed (see console). Very large cards may exceed browser canvas limits.';
+            } finally {
+                host.remove();
+                pngExportMode = false;
+                generateCards();
+                button.disabled = false;
+            }
+        }
+        document.getElementById('exportPngs').addEventListener('click', exportPngs);
 
         // Make removeSpell global for onclick handlers
         window.removeSpell = removeSpell;
